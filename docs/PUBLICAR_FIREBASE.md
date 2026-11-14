@@ -6,7 +6,7 @@ Modular Studio se publica como **sitio estático en Firebase Hosting**, con **Fi
 
 ## 1. Crear el proyecto en la consola de Firebase (una sola vez)
 
-1. Entra a https://console.firebase.google.com y crea un proyecto. El ID sugerido es `modular-studio-mx`; si eliges otro, cámbialo en `modular-studio/.firebaserc`.
+1. Entra a https://console.firebase.google.com y crea un proyecto. El ID sugerido es `modular-studio-mx`; si eliges otro, cámbialo en `.firebaserc`.
 2. **Authentication → Sign-in method → Correo electrónico/contraseña → Habilitar.**
 3. **Firestore Database → Crear base de datos → modo producción.** Elige la ubicación más cercana (por ejemplo `northamerica-south1`, Querétaro). Las reglas se suben con el deploy.
 4. **Configuración del proyecto → Tus apps → Web (`</>`)**: registra la app (sin marcar Hosting en este paso) y copia el objeto `firebaseConfig`.

@@ -1,6 +1,6 @@
 # Publica Modular Studio en Firebase Hosting (proyecto modular-studio-mx).
 # Requiere el secreto de repositorio FIREBASE_SERVICE_ACCOUNT_MODULAR_STUDIO_MX
-# (JSON de la cuenta de servicio; ver modular-studio/docs/PUBLICAR_FIREBASE.md).
+# (JSON de la cuenta de servicio; ver docs/PUBLICAR_FIREBASE.md).
 name: Publicar en Firebase
 
 on:
