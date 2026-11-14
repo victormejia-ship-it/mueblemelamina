@@ -46,7 +46,7 @@ modular-studio/
 
 ## Publicar en Firebase
 
-Resumen (detalle en `docs/PUBLICAR_FIREBASE.md`): crear un proyecto de Firebase **distinto** al de Nutripulso, habilitar correo/contraseña y Firestore, pegar la configuración web en `apps/web/.env.production.local` y ejecutar:
+Resumen (detalle en `docs/PUBLICAR_FIREBASE.md`): crear el proyecto de Firebase, habilitar correo/contraseña y Firestore, pegar la configuración web en `apps/web/.env.production.local` y ejecutar:
 
 ```bash
 npm run deploy:firebase
@@ -57,7 +57,6 @@ npm run deploy:firebase
 Requisitos: Node.js ≥ 20.10 (probado con 22), npm 10. PostgreSQL 16 sólo para el modo Prisma.
 
 ```bash
-cd modular-studio
 npm install
 cp .env.example .env
 ```

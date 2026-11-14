@@ -1,0 +1,57 @@
+# Publica Modular Studio en Firebase Hosting (proyecto modular-studio-mx).
+# Requiere el secreto de repositorio FIREBASE_SERVICE_ACCOUNT_MODULAR_STUDIO_MX
+# (JSON de la cuenta de servicio; ver modular-studio/docs/PUBLICAR_FIREBASE.md).
+name: Publicar en Firebase
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: modular-studio-firebase
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint y pruebas
+        run: |
+          npm run lint
+          npm test
+
+      - name: Compilar sitio estático
+        run: npm run build:firebase
+
+      - name: Publicar en Firebase (hosting + reglas de Firestore)
+        if: github.event_name != 'pull_request'
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_MODULAR_STUDIO_MX }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::Falta el secreto FIREBASE_SERVICE_ACCOUNT_MODULAR_STUDIO_MX. Ver docs/PUBLICAR_FIREBASE.md."
+            exit 1
+          fi
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          npx -y firebase-tools@15.35.0 deploy --only hosting,firestore --project modular-studio-mx --non-interactive
+          rm -f "$RUNNER_TEMP/sa.json"

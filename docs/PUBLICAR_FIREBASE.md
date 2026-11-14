@@ -2,7 +2,7 @@
 
 Modular Studio se publica como **sitio estático en Firebase Hosting**, con **Firebase Auth** (correo y contraseña) y **Firestore** para los datos, igual que Nutripulso. Funciona con el plan gratuito **Spark**: no usa Cloud Functions ni servidor.
 
-> Usa un **proyecto de Firebase distinto** al de Nutripulso. Si se publicara en el mismo proyecto, `firebase deploy` reemplazaría las reglas de Firestore de Nutripulso. Además, el `firebase.json` de Nutripulso (raíz del repositorio) ya excluye la carpeta `modular-studio/`, para que su código no se publique junto con Nutripulso.
+> Modular Studio tiene su propio repositorio y su propio proyecto de Firebase (`modular-studio-mx`), separados de Nutripulso.
 
 ## 1. Crear el proyecto en la consola de Firebase (una sola vez)
 
@@ -21,7 +21,7 @@ Si algún día cambias de proyecto, actualiza ese archivo y `.firebaserc`. Para 
 
 ### Opción A: automática con GitHub Actions (recomendada)
 
-El flujo `.github/workflows/modular-studio-firebase.yml` compila, corre lint y pruebas, y publica hosting + reglas cada vez que cambia `modular-studio/` en la rama principal o en la rama de trabajo. También se puede lanzar a mano desde la pestaña **Actions**.
+El flujo `.github/workflows/firebase.yml` corre lint y pruebas en cada pull request y, en cada push a `main`, compila y publica hosting + reglas. También se puede lanzar a mano desde la pestaña **Actions**.
 
 Configuración única:
 
