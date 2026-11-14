@@ -1,6 +1,9 @@
 import { catalogLookup, type Catalog, type CatalogLookup } from '../catalog';
-import type { EdgeName, FamilyDefinition, MaterialDefinition, ModuleResult, ModuleSpec, SteelRequirement } from '../types';
+import { DEFAULT_MANUFACTURING } from '../project/factory';
+import type { Box3, DimensionCheck, EdgeName, FamilyDefinition, ManufacturingSettings, MaterialDefinition, ModuleResult, ModuleSpec, SteelRequirement } from '../types';
 import { box, ModuleBuilder, overlapVolume, r2 } from './helpers';
+import { shelfSag } from './structural';
+import { verifyModule } from './verify';
 
 /** Parámetros constructivos configurables del motor (no son normas universales). */
 export const ENGINE_DEFAULTS = {
@@ -26,15 +29,16 @@ export class ModuleInputError extends Error {
 }
 
 /** Calcula piezas, herrajes, mecanizados, herrería e incidencias de un módulo. Función pura. */
-export function calculateModule(spec: ModuleSpec, catalog: Catalog, offsetXMm = 0): ModuleResult {
+export function calculateModule(spec: ModuleSpec, catalog: Catalog, offsetXMm = 0, settings: ManufacturingSettings = DEFAULT_MANUFACTURING): ModuleResult {
   const L = catalogLookup(catalog);
   const family = L.family(spec.familyId);
   const material = L.material(spec.materialId);
-  const b = new ModuleBuilder(spec.id, spec.finishId, spec.edgePolicy === 'none' ? null : spec.edgeBandId);
+  const edgeBandId = spec.edgePolicy === 'none' ? null : spec.edgeBandId;
+  const b = new ModuleBuilder(spec.id, spec.finishId, edgeBandId, edgeBandId ? L.edgeBand(edgeBandId).thicknessMm : 0, settings);
   const result = (fabricable: boolean, extra: Partial<ModuleResult> = {}): ModuleResult => ({
     moduleId: spec.id, offsetXMm, offsetYMm: 0, fabricable,
     parts: b.parts, hardware: b.hardware, machining: b.machining, steel: [], issues: b.issues,
-    theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, ...extra,
+    theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, checks: [], weightKg: 0, ...extra,
   });
 
   const { widthMm: W, heightMm: H, depthMm: D, thicknessMm: T } = spec;
@@ -64,7 +68,7 @@ export function calculateModule(spec: ModuleSpec, catalog: Catalog, offsetXMm = 
     b.issue({ code: 'EDGE_VISIBLE_UNBANDED', severity: 'warning', message: 'Política sin tapacanto: los cantos visibles quedarán expuestos (riesgo de humedad y despostillado).' });
   }
 
-  const ctx: Ctx = { spec, catalog, L, family, material, b };
+  const ctx: Ctx = { spec, catalog, L, family, material, b, settings, structuralChecks: [], expected: null, hingesPerDoor: null, halfOverlayLeaves: 0 };
   let extra: Partial<ModuleResult>;
   try {
     extra = family.geometryStrategy === 'desk' ? buildDesk(ctx) : buildBox(ctx);
@@ -78,8 +82,16 @@ export function calculateModule(spec: ModuleSpec, catalog: Catalog, offsetXMm = 
 
   checkSheetFit(ctx);
   checkCollisions(b);
+  const v = verifyModule({
+    spec, L, parts: b.parts, settings,
+    expected: ctx.expected ?? { x0: 0, x1: spec.widthMm, y0: 0, y1: spec.depthMm, z0: 0, z1: spec.heightMm },
+    slideClearanceMm: L.maybeHardware(spec.slideProductId)?.params?.sideClearancePerSideMm ?? 0,
+    hingesPerDoor: ctx.hingesPerDoor,
+    halfOverlayLeaves: ctx.halfOverlayLeaves,
+  });
+  for (const i of v.issues) b.issue(i);
   const fabricable = !b.issues.some((i) => i.severity === 'error');
-  return result(fabricable, extra);
+  return result(fabricable, { ...extra, checks: [...ctx.structuralChecks, ...v.checks], weightKg: v.weightKg });
 }
 
 interface Ctx {
@@ -89,6 +101,45 @@ interface Ctx {
   family: FamilyDefinition;
   material: MaterialDefinition;
   b: ModuleBuilder;
+  settings: ManufacturingSettings;
+  /** Verificaciones de flecha calculadas durante la construcción. */
+  structuralChecks: DimensionCheck[];
+  /** Envolvente exterior esperada (para la verificación de cierre). */
+  expected: Box3 | null;
+  hingesPerDoor: number | null;
+  halfOverlayLeaves: number;
+}
+
+/** Verifica que pata de PTR + elemento de tablero sumen la altura total pedida. */
+function steelHeightCheck(ctx: Ctx, legMm: number, what: string, panelMm: number, totalMm: number) {
+  const sum = r2(legMm + panelMm);
+  ctx.structuralChecks.push({
+    id: `${ctx.spec.id}-STH`, moduleId: ctx.spec.id, category: 'cierre', label: `Alto total con bastidor PTR (pata + ${what})`,
+    expected: `${r2(totalMm)} mm`, actual: `${r2(legMm)} + ${r2(panelMm)} = ${sum} mm`, status: Math.abs(sum - totalMm) <= 0.05 ? 'ok' : 'error',
+  });
+}
+
+/** Carga de diseño del módulo (kg/m²): la del módulo o la de su familia. */
+function designLoad(ctx: Ctx): number {
+  return ctx.spec.shelfLoadKgM2 ?? ctx.family.defaults.shelfLoadKgM2;
+}
+
+/** Registra la verificación de flecha de un elemento horizontal; devuelve si cumple. */
+function sagCheck(ctx: Ctx, label: string, spanMm: number, depthMm: number, partId?: string): boolean {
+  const load = designLoad(ctx);
+  const res = shelfSag({ spanMm, depthMm, thicknessMm: ctx.spec.thicknessMm, loadKgM2: load, material: ctx.material, limitRatio: ctx.settings.sagLimitRatio });
+  if (!res) return true;
+  ctx.structuralChecks.push({
+    id: `${ctx.spec.id}-SAG-${ctx.structuralChecks.length + 1}`, moduleId: ctx.spec.id, category: 'flecha', label: `${label} (claro ${r2(spanMm)} × fondo ${r2(depthMm)} mm, ${load} kg/m²)`,
+    expected: `≤ ${res.limitMm} mm (claro/${ctx.settings.sagLimitRatio})`, actual: `${res.finalMm} mm a largo plazo (${res.instantMm} mm inmediata)`, status: res.ok ? 'ok' : 'warning', ...(partId ? { partId } : {}),
+  });
+  if (!res.ok) {
+    ctx.b.issue({
+      code: 'SHELF_SAG_EXCEEDED', severity: 'warning', ...(partId ? { partId } : {}),
+      message: `${label}: flecha estimada ${res.finalMm} mm a largo plazo con ${load} kg/m² supera ${res.limitMm} mm (claro/${ctx.settings.sagLimitRatio}). Agregue divisor, reduzca el claro, use tablero más grueso o rigidice con un larguero.`,
+    });
+  }
+  return res.ok;
 }
 
 function familyIssues(family: FamilyDefinition, b: ModuleBuilder) {
@@ -187,21 +238,19 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
       placements: [box(0, T, y0, y1, iz0, iz1), box(W - T, W, y0, y1, iz0, iz1)] });
   }
 
-  // Respaldo sobrepuesto
-  if (backMat) {
-    b.part({ code: 'BACK', name: `Respaldo sobrepuesto ${backMat.name}`, role: 'back', lengthMm: H, widthMm: W, thicknessMm: B, grainAxis: 'none', edges: [], materialId: backMat.id,
-      placements: [box(0, W, y1, y1 + B, zb, zb + H)], notes: ['Sobrepuesto en cara posterior; fija la escuadra de la caja.'] });
-    const perimeter = 2 * (W + H);
-    const screws = Math.ceil(perimeter / ENGINE_DEFAULTS.backScrewSpacingMm);
-    const spax = L.hardware('screw-spax-4x15');
-    b.hw({ category: 'screw', productId: spax.id, productKey: spax.productKey, description: `${spax.name} — fijación de respaldo`, quantity: screws, unit: spax.unit, basis: `perímetro ${perimeter} mm / ${ENGINE_DEFAULTS.backScrewSpacingMm} mm de paso (orientativo)`, validationStatus: 'pending_validation' });
-  } else {
-    b.issue({ code: 'NO_BACK_PANEL', severity: 'warning', message: 'Sin respaldo: la caja requiere otro medio de rigidización/escuadra (travesaños, fijación a muro).' });
+  // Divisores: automáticos según la flecha calculada de entrepaños (o del piso si no hay entrepaños y no hay zoclo que lo apoye)
+  const shelfDepthForSag = cd - ENGINE_DEFAULTS.shelfBackClearanceMm;
+  const hasShelves = spec.front !== 'drawers' && spec.shelvesPerBay > 0;
+  const bottomSpans = spec.front !== 'drawers' && (spec.baseType === 'none' || spec.baseType === 'levelers');
+  const sagOk = (span: number) => {
+    const r = shelfSag({ spanMm: span, depthMm: hasShelves ? shelfDepthForSag : cd, thicknessMm: T, loadKgM2: designLoad(ctx), material, limitRatio: ctx.settings.sagLimitRatio });
+    return !r || r.ok;
+  };
+  let autoDividers = 0;
+  if (hasShelves || bottomSpans) {
+    while (autoDividers < 8 && !sagOk((IW - autoDividers * T) / (autoDividers + 1)) && (IW - (autoDividers + 1) * T) / (autoDividers + 2) >= 250) autoDividers++;
   }
-
-  // Divisores
-  const maxSpan = material.maxShelfSpanMm ?? 800;
-  let dividers = spec.dividerCount ?? Math.max(0, Math.ceil(IW / maxSpan) - 1);
+  let dividers = spec.dividerCount ?? autoDividers;
   if (spec.front === 'drawers' && dividers > 0) {
     b.issue({ code: 'DRAWERS_WITH_DIVIDERS', severity: 'warning', message: 'Los frentes de cajón ocupan todo el ancho: se omiten divisores. Divida en módulos si se requieren columnas.' });
     dividers = 0;
@@ -213,10 +262,31 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
   if (dividers > 0) {
     b.part({ code: 'DIVIDER', name: 'Divisor vertical', role: 'divider', lengthMm: IH, widthMm: cd, thicknessMm: T, grainAxis: grain, edges: edgesFor(spec, 'side').slice(0, 1), materialId: material.id,
       placements: Array.from({ length: dividers }, (_, i) => box(bayX0(i) + bayW, bayX0(i) + bayW + T, y0, y1, iz0, iz1)),
-      notes: spec.dividerCount === null ? [`Divisores automáticos por luz libre orientativa de ${maxSpan} mm del material.`] : [] });
+      notes: spec.dividerCount === null ? [`Divisores automáticos: mínimo necesario para que la flecha calculada cumpla claro/${ctx.settings.sagLimitRatio} con ${designLoad(ctx)} kg/m².`] : [] });
   }
-  if (bayW > maxSpan) {
-    b.issue({ code: 'SHELF_SPAN_EXCEEDED', severity: 'warning', message: `Luz libre de ${r2(bayW)} mm supera la orientativa de ${maxSpan} mm para ${material.name}: riesgo de flecha en entrepaños/tapa. Validar carga o agregar divisor.` });
+
+  // Respaldo sobrepuesto (dividido en piezas que quepan en el tablero, con juntas sobre divisores)
+  if (backMat) {
+    const segs = backSegments(ctx, backMat, dividers, bayX0, bayW);
+    const groups = new Map<number, [number, number][]>();
+    for (const sg of segs) {
+      const w = r2(sg[1] - sg[0]);
+      const key = [...groups.keys()].find((x) => Math.abs(x - w) < 0.02) ?? w;
+      groups.set(key, [...(groups.get(key) ?? []), sg]);
+    }
+    let gi = 0;
+    for (const [w, list] of groups) {
+      b.part({ code: gi === 0 ? 'BACK' : `BACK_${gi + 1}`, name: segs.length > 1 ? `Respaldo sobrepuesto ${backMat.name} (sección)` : `Respaldo sobrepuesto ${backMat.name}`, role: 'back', lengthMm: H, widthMm: w, thicknessMm: B, grainAxis: 'none', edges: [], materialId: backMat.id,
+        placements: list.map(([a, c]) => box(a, c, y1, y1 + B, zb, zb + H)),
+        notes: [segs.length > 1 ? `Respaldo en ${segs.length} secciones por tamaño de tablero; juntas sobre divisor o listón.` : 'Sobrepuesto en cara posterior; fija la escuadra de la caja.'] });
+      gi++;
+    }
+    const perimeter = 2 * (W + H) + (segs.length - 1) * 2 * H;
+    const screws = Math.ceil(perimeter / ENGINE_DEFAULTS.backScrewSpacingMm);
+    const spax = L.hardware('screw-spax-4x15');
+    b.hw({ category: 'screw', productId: spax.id, productKey: spax.productKey, description: `${spax.name} — fijación de respaldo`, quantity: screws, unit: spax.unit, basis: `perímetro + juntas ${perimeter} mm / ${ENGINE_DEFAULTS.backScrewSpacingMm} mm de paso (orientativo)`, validationStatus: 'pending_validation' });
+  } else {
+    b.issue({ code: 'NO_BACK_PANEL', severity: 'warning', message: 'Sin respaldo: la caja requiere otro medio de rigidización/escuadra (travesaños, fijación a muro).' });
   }
 
   // Unión de caja: 4 uniones + 2 por divisor
@@ -259,6 +329,11 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
     }
   }
   if (shelfPlacements.length) {
+    sagCheck(ctx, 'Flecha de entrepaño', bayW, shelfDepth, `${spec.id}-SHELF`);
+  } else if (bottomSpans) {
+    sagCheck(ctx, 'Flecha del piso (sin zoclo que lo apoye)', bayW, cd, `${spec.id}-HORIZONTAL`);
+  }
+  if (shelfPlacements.length) {
     const shelf = b.part({ code: 'SHELF', name: 'Entrepaño móvil', role: 'shelf', lengthMm: shelfLen, widthMm: shelfDepth, thicknessMm: T, grainAxis: grain, edges: edgesFor(spec, 'shelf'), materialId: material.id,
       placements: shelfPlacements, notes: [`Holgura ${ENGINE_DEFAULTS.shelfSideClearanceMm} mm en ancho y ${ENGINE_DEFAULTS.shelfBackClearanceMm} mm en fondo (nominal).`] });
     b.hw({ category: 'shelf_pin', productId: shelfPin.id, productKey: shelfPin.productKey, description: shelfPin.name, quantity: shelf.quantity * 4, unit: shelfPin.unit, basis: `${shelf.quantity} entrepaños × 4 soportes`, validationStatus: shelfPin.validationStatus });
@@ -285,12 +360,48 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
   // Montaje y antivuelco
   mountingHardware(ctx);
 
+  ctx.expected = { x0: 0, x1: W, y0: 0, y1: D, z0: spec.baseType === 'plinth' && baseH > 0 ? 0 : zb, z1: zb + H };
+
   return {
     theoreticalDiagonalMm: r2(Math.hypot(W, H)),
     carcassDepthMm: r2(cd),
     overallHeightMm: H + baseH,
     steel,
   };
+}
+
+/**
+ * Secciones del respaldo [x0, x1]. Si el respaldo completo no cabe en el tablero (con 10 mm de escuadrado
+ * por lado), se divide con juntas centradas sobre divisores; si no hay divisor útil, en partes iguales
+ * con aviso de listón de apoyo.
+ */
+function backSegments(ctx: Ctx, backMat: MaterialDefinition, dividers: number, bayX0: (i: number) => number, bayW: number): [number, number][] {
+  const { widthMm: W, heightMm: H, thicknessMm: T } = ctx.spec;
+  if (!backMat.sheet) return [[0, W]];
+  const sl = backMat.sheet.lengthMm - 20, sw = backMat.sheet.widthMm - 20;
+  const maxW = H <= sw ? sl : H <= sl ? sw : 0;
+  if (maxW === 0 || W <= maxW) return [[0, W]];
+  const centers = Array.from({ length: dividers }, (_, i) => bayX0(i) + bayW + T / 2);
+  const cuts: number[] = [];
+  let start = 0;
+  let unsupported = 0;
+  while (W - start > maxW) {
+    const options = centers.filter((c) => c > start + 1 && c - start <= maxW);
+    if (options.length) {
+      start = options[options.length - 1]!;
+    } else {
+      const remaining = W - start;
+      const k = Math.ceil(remaining / maxW);
+      start = start + remaining / k;
+      unsupported++;
+    }
+    cuts.push(start);
+  }
+  if (unsupported) {
+    ctx.b.issue({ code: 'BACK_JOINT_UNSUPPORTED', severity: 'warning', message: `Respaldo dividido en ${cuts.length + 1} secciones por tamaño de tablero; ${unsupported} junta(s) sin divisor detrás: agregar listón vertical de apoyo.` });
+  }
+  const edges = [0, ...cuts, W];
+  return edges.slice(1).map((x, i) => [edges[i]!, x] as [number, number]);
 }
 
 /** Posiciones Z equiespaciadas para n entrepaños de espesor t entre z0 y z1. */
@@ -304,25 +415,67 @@ function buildDoors(ctx: Ctx, zb: number, dividers: number) {
   const { spec, L, b, material } = ctx;
   const { widthMm: W, heightMm: H, thicknessMm: T } = spec;
   const r = spec.revealMm, g = spec.frontGapMm;
-  const n = spec.doorCount ?? Math.max(1, Math.ceil(W / ENGINE_DEFAULTS.maxDoorWidthMm));
-  const dw = (W - 2 * r - (n - 1) * g) / n;
+  // Automático: hojas repartidas por hueco para que las juntas caigan sobre los divisores.
+  const bays = dividers + 1;
+  const n = spec.doorCount ?? bays * Math.max(1, Math.ceil(W / bays / ENGINE_DEFAULTS.maxDoorWidthMm));
   const dh = H - 2 * r;
-  if (dw < 100) throw new ModuleInputError('DOOR_TOO_NARROW', `Puertas de ${r2(dw)} mm: reduzca el número de hojas.`);
-  const door = b.part({ code: 'DOOR', name: n === 1 ? 'Puerta sobrepuesta' : 'Puerta sobrepuesta (hoja)', role: 'front', lengthMm: dh, widthMm: dw, thicknessMm: T, grainAxis: 'length', edges: edgesFor(spec, 'front'), materialId: material.id,
-    placements: Array.from({ length: n }, (_, i) => box(r + i * (dw + g), r + i * (dw + g) + dw, 0, T, zb + r, zb + r + dh)),
-    notes: [`Holgura perimetral ${r} mm y ${g} mm entre hojas. Verificar solape con la bisagra elegida.`], validationStatus: 'pending_validation' });
-  if (dw > ENGINE_DEFAULTS.maxDoorWidthMm) b.issue({ code: 'DOOR_TOO_WIDE', severity: 'warning', partId: door.id, message: `Puerta de ${r2(dw)} mm de ancho: verificar pandeo, peso y apertura segura.` });
-  if (dividers > 0 && n % (dividers + 1) !== 0) b.issue({ code: 'DOOR_DIVIDER_MISALIGNED', severity: 'info', message: `${n} puertas con ${dividers} divisor(es): las juntas de las hojas no coinciden con los divisores.` });
+  // Tramos a cubrir: si las hojas son múltiplo de los huecos, cada tramo va de junta a junta,
+  // con la junta centrada sobre el divisor (las hojas extremas cubren además el costado).
+  const segments: [number, number, number][] = [];
+  if (dividers > 0 && n % bays === 0) {
+    const IW = W - 2 * T;
+    const bayW = (IW - dividers * T) / bays;
+    const centers = Array.from({ length: dividers }, (_, i) => T + (i + 1) * bayW + i * T + T / 2);
+    const edges = [r - g / 2, ...centers, W - r + g / 2];
+    for (let i = 0; i < bays; i++) segments.push([edges[i]! + g / 2, edges[i + 1]! - g / 2, n / bays]);
+  } else {
+    segments.push([r, W - r, n]);
+  }
+  const doors: { x0: number; x1: number }[] = [];
+  for (const [a, c, k] of segments) {
+    const w = (c - a - (k - 1) * g) / k;
+    for (let j = 0; j < k; j++) doors.push({ x0: a + j * (w + g), x1: a + j * (w + g) + w });
+  }
+  if (Math.min(...doors.map((d) => d.x1 - d.x0)) < 100) throw new ModuleInputError('DOOR_TOO_NARROW', `Puertas de ${r2(Math.min(...doors.map((d) => d.x1 - d.x0)))} mm: reduzca el número de hojas.`);
+  // Agrupar hojas de igual ancho en un mismo modelo de corte (DOOR, DOOR_2, …)
+  const groups = new Map<number, { x0: number; x1: number }[]>();
+  for (const d of doors) {
+    const w = r2(d.x1 - d.x0);
+    const key = [...groups.keys()].find((x) => Math.abs(x - w) < 0.02) ?? w;
+    groups.set(key, [...(groups.get(key) ?? []), d]);
+  }
+  let door!: ReturnType<typeof b.part>;
+  let gi = 0;
+  for (const [dw, list] of groups) {
+    const part = b.part({ code: gi === 0 ? 'DOOR' : `DOOR_${gi + 1}`, name: n === 1 ? 'Puerta sobrepuesta' : groups.size > 1 ? `Puerta sobrepuesta (hoja ${gi === 0 ? 'tipo A' : `tipo ${String.fromCharCode(65 + gi)}`})` : 'Puerta sobrepuesta (hoja)',
+      role: 'front', lengthMm: dh, widthMm: dw, thicknessMm: T, grainAxis: 'length', edges: edgesFor(spec, 'front'), materialId: material.id,
+      placements: list.map((d) => box(d.x0, d.x1, 0, T, zb + r, zb + r + dh)),
+      notes: [`Holgura perimetral ${r} mm y ${g} mm entre hojas${dividers ? '; juntas centradas sobre divisores' : ''}. Verificar solape con la bisagra elegida.`], validationStatus: 'pending_validation' });
+    if (gi === 0) door = part;
+    if (dw > ENGINE_DEFAULTS.maxDoorWidthMm) b.issue({ code: 'DOOR_TOO_WIDE', severity: 'warning', partId: part.id, message: `Puerta de ${r2(dw)} mm de ancho: verificar pandeo, peso y apertura segura.` });
+    gi++;
+  }
+  if (dividers > 0 && n % bays !== 0) b.issue({ code: 'DOOR_DIVIDER_MISALIGNED', severity: 'warning', partId: door.id, message: `${n} puertas con ${dividers} divisor(es): hay hojas que cruzan un divisor y juntas sobre huecos abiertos. Use un múltiplo de ${bays} hojas.` });
 
   const hinge = L.maybeHardware(spec.hingeProductId) ?? L.hardware('hinge-generic-110');
   const rules = L.hingeRulesFor(hinge);
   const rule = rules.find((x) => dh <= x.maxDoorHeightMm);
   if (!rule) throw new ModuleInputError('DOOR_TOO_TALL', `Puerta de ${r2(dh)} mm excede la tabla de bisagras disponible (${rules.at(-1)?.maxDoorHeightMm ?? 0} mm).`);
-  b.hw({ category: 'hinge', productId: hinge.id, productKey: hinge.productKey, description: hinge.name, quantity: n * rule.hingesPerDoor, unit: hinge.unit,
-    basis: `${n} puertas × ${rule.hingesPerDoor} (alto ${r2(dh)} mm ≤ ${rule.maxDoorHeightMm}; tabla ${hinge.params?.hingeRules ? 'del producto' : 'orientativa'})`,
-    validationStatus: hinge.technicalDatasheetUrl ? hinge.validationStatus : 'pending_validation' });
+  // Hojas que giran sobre un divisor compartido con otra hoja: requieren bisagra de semi-solape.
+  const perBay = segments.length > 1 ? n / bays : 0;
+  const halfLeaves = perBay >= 2 ? 2 * dividers : perBay === 1 ? Math.max(0, bays - 2) : 0;
+  ctx.halfOverlayLeaves = halfLeaves;
+  const basis = (k: number) => `${k} puertas × ${rule.hingesPerDoor} (alto ${r2(dh)} mm ≤ ${rule.maxDoorHeightMm}; tabla ${hinge.params?.hingeRules ? 'del producto' : 'orientativa'})`;
+  b.hw({ category: 'hinge', productId: hinge.id, productKey: hinge.productKey, description: hinge.name, quantity: (n - halfLeaves) * rule.hingesPerDoor, unit: hinge.unit,
+    basis: basis(n - halfLeaves), validationStatus: hinge.technicalDatasheetUrl ? hinge.validationStatus : 'pending_validation' });
+  if (halfLeaves > 0) {
+    const half = L.hardware('hinge-generic-110-half');
+    b.hw({ category: 'hinge', productId: half.id, productKey: half.productKey, description: half.name, quantity: halfLeaves * rule.hingesPerDoor, unit: half.unit,
+      basis: `${basis(halfLeaves)}; hojas que giran sobre divisor`, validationStatus: 'pending_validation' });
+  }
+  ctx.hingesPerDoor = rule.hingesPerDoor;
   b.issue({ code: 'HINGE_PENDING_VALIDATION', severity: 'warning', message: `Bisagras (${hinge.name}): cantidad y cazoleta pendientes de validar con ficha técnica del fabricante.` });
-  if (hinge.machiningPatternId) b.machine(L.pattern(hinge.machiningPatternId), door, rule.hingesPerDoor, 'Cazoleta de bisagra', hinge.id);
+  if (hinge.machiningPatternId) for (const d of b.parts.filter((p) => p.code === 'DOOR' || p.code.startsWith('DOOR_'))) b.machine(L.pattern(hinge.machiningPatternId), d, rule.hingesPerDoor, 'Cazoleta de bisagra', hinge.id);
   handles(ctx, n);
 }
 
@@ -425,6 +578,7 @@ function buildBase(ctx: Ctx, cd: number, y0: number, steel: SteelRequirement[]) 
         { id: `${spec.id}-ST-RAIL-D`, label: 'Travesaño lateral', lengthMm: r2(cd - 2 * sec), count: 2 },
       ],
     });
+    steelHeightCheck(ctx, h, 'caja', spec.heightMm, h + spec.heightMm);
     b.issue({ code: 'STEEL_LOAD_VALIDATION_REQUIRED', severity: 'blocker', message: `Bastidor de ${profile.name}: requiere validación de cargas, soldadura y anclaje por responsable estructural.` });
   }
 }
@@ -495,10 +649,19 @@ function buildDesk(ctx: Ctx): Partial<ModuleResult> {
     }
     joineryHardware(ctx, joints, D, [{ partId: `${spec.id}-DESK_SIDE`, joints }]);
   }
-  const span = W - 2 * T;
-  const maxSpan = (material.maxShelfSpanMm ?? 800) * 1.5;
-  if (span > maxSpan) b.issue({ code: 'DESK_TOP_SPAN', severity: 'warning', message: `Claro de cubierta ${r2(span)} mm: verificar flecha con la carga prevista; agregar larguero o apoyo intermedio.` });
+  const hasModesty = b.parts.some((p) => p.code === 'DESK_MODESTY');
+  if (!spec.steel.enabled && !hasModesty) {
+    sagCheck(ctx, 'Flecha de cubierta entre costados', W - 2 * T, D, `${spec.id}-DESK_TOP`);
+  } else {
+    ctx.structuralChecks.push({
+      id: `${spec.id}-SAG-1`, moduleId: spec.id, category: 'flecha', label: 'Cubierta de escritorio',
+      expected: 'apoyo continuo', actual: spec.steel.enabled ? 'apoyada en largueros de PTR (validar bastidor)' : 'apoyada en el faldón trasero; borde frontal sin apoyo: verificar con carga puntual', status: 'info', partId: `${spec.id}-DESK_TOP`,
+    });
+  }
   b.issue({ code: 'DESK_RIGIDITY_REVIEW', severity: 'info', message: 'Verificar rigidez y flecha de la cubierta para la carga prevista.' });
+  // Con bastidor de PTR sólo la cubierta es tablero: la altura se verifica como pata + cubierta.
+  ctx.expected = { x0: 0, x1: W, y0: 0, y1: D, z0: spec.steel.enabled ? H - T : 0, z1: H };
+  if (spec.steel.enabled) steelHeightCheck(ctx, legH, 'cubierta', T, H);
   return { theoreticalDiagonalMm: r2(Math.hypot(W, H)), carcassDepthMm: D, overallHeightMm: H, steel };
 }
 
@@ -514,8 +677,8 @@ function checkSheetFit(ctx: Ctx) {
     if (!m.sheet) continue;
     const { lengthMm: SL, widthMm: SW } = m.sheet;
     const canRotate = p.grainAxis === 'none' || !finish.hasGrain;
-    const fits = (p.lengthMm <= SL && p.widthMm <= SW) || (canRotate && p.lengthMm <= SW && p.widthMm <= SL);
-    if (!fits) b.issue({ code: 'PART_EXCEEDS_SHEET', severity: 'error', partId: p.id, message: `${p.id} (${p.lengthMm} × ${p.widthMm} mm) no cabe en el tablero ${SL} × ${SW} mm${canRotate ? '' : ' respetando la veta'}. Dividir en módulos o usar formato mayor.` });
+    const fits = (p.cutLengthMm <= SL && p.cutWidthMm <= SW) || (canRotate && p.cutLengthMm <= SW && p.cutWidthMm <= SL);
+    if (!fits) b.issue({ code: 'PART_EXCEEDS_SHEET', severity: 'error', partId: p.id, message: `${p.id} (corte ${p.cutLengthMm} × ${p.cutWidthMm} mm) no cabe en el tablero ${SL} × ${SW} mm${canRotate ? '' : ' respetando la veta'}. Dividir en módulos o usar formato mayor.` });
   }
 }
 

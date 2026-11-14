@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Catalog } from '../catalog';
 import { SCHEMA_VERSION, type Project, type SupplierOffer } from '../types';
-import { createModule, defaultPricing } from './factory';
+import { DEFAULT_MANUFACTURING, createModule, defaultPricing } from './factory';
 
 const mm = z.number().finite();
 const posMm = z.number().finite().positive();
@@ -29,6 +29,8 @@ export const ModuleSpecSchema = z.object({
   baseType: z.enum(['none', 'plinth', 'levelers', 'steel_frame']),
   baseHeightMm: mm.min(0).max(400),
   mount: z.enum(['floor', 'wall']),
+  // Campo agregado después de 1.0.0: los proyectos guardados sin él usan la carga de la familia.
+  shelfLoadKgM2: z.number().min(0).max(500).nullable().default(null),
   joinery: z.enum(['cam', 'dowel', 'screw', 'mixed']),
   hingeProductId: z.string().nullable(),
   slideProductId: z.string().nullable(),
@@ -71,6 +73,16 @@ export const ProjectSchema = z.object({
   modules: z.array(ModuleSpecSchema).max(60),
   pricing: PricingSchema,
   cut: z.object({ kerfMm: mm.min(0).max(10), trimMarginMm: mm.min(0).max(50) }),
+  // Campo agregado después de 1.0.0: los proyectos guardados sin él usan los valores de taller por defecto.
+  manufacturing: z.object({
+    edgeCompensation: z.boolean(),
+    premillMm: mm.min(0).max(5),
+    sagLimitRatio: z.number().min(50).max(1000),
+    minPartWidthMm: mm.min(0).max(200),
+    minEdgebandWidthMm: mm.min(0).max(300),
+    minEdgebandLengthMm: mm.min(0).max(600),
+    contactToleranceMm: mm.min(0.1).max(5),
+  }).default(DEFAULT_MANUFACTURING),
   inspection: z.object({
     checklist: z.record(z.string(), z.boolean()),
     diagonals: z.record(z.string(), z.object({ d1Mm: z.number().nullable(), d2Mm: z.number().nullable() })),
@@ -169,7 +181,7 @@ export function migrateProject(raw: unknown, catalog: Catalog, now: string): { p
   const project = parseProject({
     schemaVersion: SCHEMA_VERSION, id: String(legacy.id ?? 'migrado'), name: String(legacy.projectName ?? 'Proyecto migrado'),
     customer: '', site: '', currency: 'MXN', unit: 'mm', createdAt: now, updatedAt: now, modules, pricing,
-    cut: { kerfMm: 4, trimMarginMm: 10 }, inspection: { checklist: {}, diagonals: {}, diagonalToleranceMm: 2, notes: '' },
+    cut: { kerfMm: 4, trimMarginMm: 10 }, manufacturing: { ...DEFAULT_MANUFACTURING }, inspection: { checklist: {}, diagonals: {}, diagonalToleranceMm: 2, notes: '' },
     approval: null, status: 'DRAFT_NOT_RELEASED_FOR_MANUFACTURING',
   });
   return { project, migrated: true, notes };

@@ -20,6 +20,19 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await expect(page.getByTestId('parts-table')).toContainText('M01-HORIZONTAL');
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).toContainText('864');
 
+  // Medidas de corte con compensación de canto y verificación dimensional
+  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).toContainText('558.55');
+  await page.getByTestId('tab-qc').click();
+  await expect(page.getByTestId('dimension-checks')).toContainText('Ancho exterior');
+  await expect(page.getByTestId('dimension-checks')).toContainText('0 No cumple');
+  await page.getByTestId('edge-compensation').uncheck();
+  await page.getByTestId('tab-parts').click();
+  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).not.toContainText('558.55');
+  await page.getByTestId('tab-qc').click();
+  await page.getByTestId('edge-compensation').check();
+  await page.getByTestId('tab-model').click();
+  await expect(page.getByTestId('checks-summary')).toHaveText('Todo cuadra');
+
   // Error bloqueante si W <= 2T
   await page.getByTestId('tab-model').click();
   await page.getByTestId('mod-width').fill('30');

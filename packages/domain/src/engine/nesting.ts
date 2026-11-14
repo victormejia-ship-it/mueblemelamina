@@ -31,7 +31,8 @@ export function nestParts(parts: PanelPart[], catalog: Catalog, cut: CutSettings
   return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([materialId, list]) => {
     const m = L.material(materialId);
     const pieces = list.map((p) => ({
-      partId: p.id, label: p.code, lengthMm: p.lengthMm, widthMm: p.widthMm, quantity: p.quantity,
+      // Se acomoda la medida de CORTE (con compensación de canto), no la final.
+      partId: p.id, label: p.code, lengthMm: p.cutLengthMm, widthMm: p.cutWidthMm, quantity: p.quantity,
       canRotate: p.grainAxis === 'none' || !L.finish(p.finishId).hasGrain || m.kind === 'back_panel',
     }));
     const sheet = m.sheet ? { lengthMm: m.sheet.lengthMm, widthMm: m.sheet.widthMm, kerfMm: cut.kerfMm, trimMarginMm: cut.trimMarginMm } : { lengthMm: 2440, widthMm: 1220, kerfMm: cut.kerfMm, trimMarginMm: cut.trimMarginMm };

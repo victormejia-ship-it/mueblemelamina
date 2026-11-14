@@ -26,11 +26,11 @@ const num = (n: number, sep: CsvSeparator) => (sep === ';' ? String(n).replace('
 
 export function partsCsv(plan: ManufacturingPlan, catalog: Catalog, sep: CsvSeparator = ','): string {
   const L = catalogLookup(catalog);
-  const head = ['ID', 'Módulo', 'Pieza', 'Rol', 'Cantidad', 'Largo (mm)', 'Ancho (mm)', 'Espesor (mm)', 'Veta', 'Canto L1', 'Canto L2', 'Canto A1', 'Canto A2', 'Material', 'SKU material', 'Acabado', 'Área (m²)', 'Estado validación', 'Mecanizados', 'Observaciones'];
+  const head = ['ID', 'Módulo', 'Pieza', 'Rol', 'Cantidad', 'Largo final (mm)', 'Ancho final (mm)', 'Espesor (mm)', 'Largo de corte (mm)', 'Ancho de corte (mm)', 'Veta', 'Canto L1', 'Canto L2', 'Canto A1', 'Canto A2', 'Material', 'SKU material', 'Acabado', 'Área (m²)', 'Estado validación', 'Mecanizados', 'Observaciones'];
   const rows = plan.calc.parts.map((p) => {
     const m = L.material(p.materialId);
     return [
-      p.id, p.moduleId, p.name, p.role, p.quantity, num(p.lengthMm, sep), num(p.widthMm, sep), num(p.thicknessMm, sep), p.grainAxis,
+      p.id, p.moduleId, p.name, p.role, p.quantity, num(p.lengthMm, sep), num(p.widthMm, sep), num(p.thicknessMm, sep), num(p.cutLengthMm, sep), num(p.cutWidthMm, sep), p.grainAxis,
       p.edgeBand.L1 ?? '', p.edgeBand.L2 ?? '', p.edgeBand.A1 ?? '', p.edgeBand.A2 ?? '', m.name, m.productKey, L.finish(p.finishId).name,
       num(Math.round((p.lengthMm * p.widthMm * p.quantity) / 1e4) / 100, sep), p.validationStatus, p.machiningOperationIds.length, p.notes.join(' | '),
     ];
@@ -65,6 +65,14 @@ export function hardwareCsv(plan: ManufacturingPlan, sep: CsvSeparator = ','): s
   const rows = plan.calc.hardware.map((h) => [h.id, h.moduleId, h.category, h.description, h.productKey, num(h.quantity, sep), h.unit, h.basis, h.validationStatus]);
   const steel = plan.calc.steel.flatMap((s) => s.pieces.map((p) => [p.id, s.moduleId, `herrería ${s.shape}`, `${p.label} ${s.sectionSpec}`, s.profileId, p.count, `pza de ${p.lengthMm} mm`, 'geometría', s.loadValidationRequired ? 'requiere validación de cargas' : '']));
   return toCsv([head, ...rows, ...steel], sep);
+}
+
+/** Verificación dimensional (esperado vs. calculado) por módulo. */
+export function checksCsv(plan: ManufacturingPlan, sep: CsvSeparator = ','): string {
+  const head = ['ID', 'Módulo', 'Tipo', 'Verificación', 'Esperado', 'Calculado', 'Resultado', 'Pieza'];
+  const label = { ok: 'Cumple', info: 'Info', warning: 'Revisar', error: 'No cumple' } as const;
+  const rows = plan.calc.modules.flatMap((m) => m.checks).map((c) => [c.id, c.moduleId, c.category, c.label, c.expected, c.actual, label[c.status], c.partId ?? '']);
+  return toCsv([head, ...rows], sep);
 }
 
 export function projectJson(project: Project, plan: ManufacturingPlan, exportedAt: string): string {

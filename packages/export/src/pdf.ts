@@ -133,11 +133,14 @@ export async function buildPdf(project: Project, plan: ManufacturingPlan, catalo
       return [m.id, m.label, L.family(m.familyId).name, `${m.widthMm}×${m.heightMm}×${m.depthMm}`, `${L.material(m.materialId).name}`, m.front === 'doors' ? 'Puertas' : m.front === 'drawers' ? `${m.drawerCount} cajones` : 'Abierto', m.baseType, r?.theoreticalDiagonalMm ? `${r.theoreticalDiagonalMm} mm` : '—'];
     }), [30, 80, 80, 70, 90, 50, 45, 55]);
 
-  w.h2('Lista de corte / despiece (medidas nominales antes de tapacanto)');
-  w.table(['ID', 'Pieza', 'Cant.', 'Largo', 'Ancho', 'Esp.', 'Veta', 'Cantos L1/L2/A1/A2', 'Material', 'Estado'],
-    plan.calc.parts.map((p) => [p.id, p.name, String(p.quantity), String(p.lengthMm), String(p.widthMm), String(p.thicknessMm), p.grainAxis,
-      (['L1', 'L2', 'A1', 'A2'] as const).map((e) => (p.edgeBand[e] ? '1' : '0')).join('/'), L.material(p.materialId).name, p.validationStatus]),
-    [70, 95, 25, 35, 35, 25, 35, 55, 70, 60]);
+  w.h2('Lista de corte / despiece');
+  w.text(project.manufacturing.edgeCompensation
+    ? `Medida de CORTE = medida final − espesor de canto por arista canteada${project.manufacturing.premillMm ? ` + ${project.manufacturing.premillMm} mm de repasado` : ''}. La medida final es la que queda armada.`
+    : 'Compensación de canto desactivada: medida de corte = medida final.', 8);
+  w.table(['ID', 'Pieza', 'Cant.', 'Corte largo', 'Corte ancho', 'Esp.', 'Final L×A', 'Veta', 'Cantos L1/L2/A1/A2', 'Material'],
+    plan.calc.parts.map((p) => [p.id, p.name, String(p.quantity), String(p.cutLengthMm), String(p.cutWidthMm), String(p.thicknessMm), `${p.lengthMm}×${p.widthMm}`, p.grainAxis,
+      (['L1', 'L2', 'A1', 'A2'] as const).map((e) => (p.edgeBand[e] ? '1' : '0')).join('/'), L.material(p.materialId).name]),
+    [70, 95, 25, 38, 38, 25, 55, 32, 55, 70]);
   for (const e of plan.calc.edgeBands) w.text(`Canto ${L.edgeBand(e.edgeBandId).name}: neto ${(e.netLengthMm / 1000).toFixed(2)} m en ${e.segments} tramos; compra ${(e.purchaseLengthMm / 1000).toFixed(2)} m (margen y merma).`, 8);
 
   w.h2('Tableros y acomodo');
@@ -160,6 +163,15 @@ export async function buildPdf(project: Project, plan: ManufacturingPlan, catalo
   w.h2('Mecanizado');
   const pending = plan.calc.machining.filter((m) => m.validationStatus !== 'verified').length;
   w.text(`${plan.calc.machining.length} operaciones; ${pending} pendientes de ficha técnica (sin coordenadas). No perforar operaciones pendientes.`, 8);
+
+  w.h2('Verificación dimensional');
+  const allChecks = plan.calc.modules.flatMap((m) => m.checks);
+  const cnt = (s: string) => allChecks.filter((c) => c.status === s).length;
+  const weight = Math.round(plan.calc.modules.reduce((s, m) => s + m.weightKg, 0) * 10) / 10;
+  w.text(`${allChecks.length} verificaciones: ${cnt('ok')} cumplen, ${cnt('warning')} por revisar, ${cnt('error')} no cumplen, ${cnt('info')} informativas. Peso estimado de tableros: ${weight} kg.`, 9, true);
+  w.table(['Módulo', 'Verificación', 'Esperado', 'Calculado', 'Resultado'],
+    allChecks.filter((c) => c.status !== 'ok' || c.category === 'cierre' || c.category === 'flecha').map((c) => [c.moduleId, c.label, c.expected, c.actual, ({ ok: 'Cumple', info: 'Info', warning: 'Revisar', error: 'No cumple' } as const)[c.status]]),
+    [35, 170, 110, 130, 50]);
 
   w.h2('Incidencias');
   const order = { error: 0, blocker: 1, warning: 2, info: 3 } as const;

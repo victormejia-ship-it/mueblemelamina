@@ -26,6 +26,7 @@ export async function exportInBrowser(project: Project, offers: SupplierOffer[],
     case 'parts-csv': return saveBlob(ex.partsCsv(plan, DEFAULT_CATALOG, sep), 'text/csv;charset=utf-8', `${base}-despiece.csv`);
     case 'quote-csv': return saveBlob(ex.quoteCsv(plan, sep), 'text/csv;charset=utf-8', `${base}-cotizacion.csv`);
     case 'hardware-csv': return saveBlob(ex.hardwareCsv(plan, sep), 'text/csv;charset=utf-8', `${base}-herrajes.csv`);
+    case 'checks-csv': return saveBlob(ex.checksCsv(plan, sep), 'text/csv;charset=utf-8', `${base}-verificacion.csv`);
     case 'svg': return saveBlob(ex.projectSvg(project, plan, DEFAULT_CATALOG, { view: opts.view ?? 'iso', exploded: !!opts.exploded, showIds: !!opts.exploded }), 'image/svg+xml', `${base}-${opts.view ?? 'iso'}.svg`);
     case 'cut-svg': {
       const maps = ex.cutMapsSvg(plan);

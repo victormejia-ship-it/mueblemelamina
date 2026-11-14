@@ -2,20 +2,23 @@ import type { EdgeBandDefinition, FinishDefinition, MaterialDefinition, SteelPro
 
 /**
  * Formatos de tablero "ejemplo" (1220×2440): validar por SKU con el proveedor.
+ * Densidad y módulo de elasticidad: valores TÍPICOS conservadores para estimar peso y flecha;
+ * sustituir por los de la ficha técnica del tablero comprado. kdef según Eurocódigo 5 (clase de servicio 1):
+ * aglomerado/MDF 2.25, contrachapado 0.8, madera maciza 0.6.
  * Los precios NO viven aquí: se obtienen de ofertas con fuente y fecha (ver pricing).
  */
 export const MATERIALS: MaterialDefinition[] = [
-  { id: 'mel18', name: 'Melamina 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel18', maxShelfSpanMm: 800, notes: 'Formato comercial ejemplo; validar por SKU.' },
-  { id: 'mel15', name: 'Melamina 15 mm', kind: 'board', thicknessMm: 15, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel15', maxShelfSpanMm: 650 },
-  { id: 'mel16', name: 'Melamina 16 mm (cajones)', kind: 'board', thicknessMm: 16, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel16', maxShelfSpanMm: 700 },
-  { id: 'mdf18', name: 'MDF laminado 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mdf18', maxShelfSpanMm: 750 },
-  { id: 'lam18', name: 'Tablero laminado alta presión 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:lam18', maxShelfSpanMm: 800 },
-  { id: 'ply18', name: 'Contrachapado 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:ply18', maxShelfSpanMm: 900 },
-  { id: 'mel18rh', name: 'Melamina RH (resistente a humedad) 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel18rh', maxShelfSpanMm: 800 },
-  { id: 'oak18', name: 'Roble macizo 18 mm', kind: 'solidwood', thicknessMm: 18, sheet: null, productKey: 'solid:oak18', maxShelfSpanMm: null, notes: 'Madera maciza: rediseñar uniones y permitir movimiento higroscópico; se cotiza por pie-tabla o pieza.' },
-  { id: 'hdf3', name: 'HDF 3 mm (respaldo)', kind: 'back_panel', thicknessMm: 3, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:hdf3', maxShelfSpanMm: null },
-  { id: 'hdf6', name: 'MDF/HDF 6 mm (respaldo / fondo cajón)', kind: 'back_panel', thicknessMm: 6, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:hdf6', maxShelfSpanMm: null },
-  { id: 'mel9', name: 'Melamina 9 mm (respaldo rígido)', kind: 'back_panel', thicknessMm: 9, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel9', maxShelfSpanMm: null },
+  { id: 'mel18', name: 'Melamina 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel18', densityKgM3: 650, elasticModulusMPa: 2800, creepKdef: 2.25, notes: 'Formato comercial ejemplo; validar por SKU.' },
+  { id: 'mel15', name: 'Melamina 15 mm', kind: 'board', thicknessMm: 15, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel15', densityKgM3: 660, elasticModulusMPa: 2800, creepKdef: 2.25},
+  { id: 'mel16', name: 'Melamina 16 mm (cajones)', kind: 'board', thicknessMm: 16, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel16', densityKgM3: 660, elasticModulusMPa: 2800, creepKdef: 2.25},
+  { id: 'mdf18', name: 'MDF laminado 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mdf18', densityKgM3: 750, elasticModulusMPa: 3000, creepKdef: 2.25},
+  { id: 'lam18', name: 'Tablero laminado alta presión 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:lam18', densityKgM3: 700, elasticModulusMPa: 2800, creepKdef: 2.25},
+  { id: 'ply18', name: 'Contrachapado 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:ply18', densityKgM3: 600, elasticModulusMPa: 6000, creepKdef: 0.8},
+  { id: 'mel18rh', name: 'Melamina RH (resistente a humedad) 18 mm', kind: 'board', thicknessMm: 18, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel18rh', densityKgM3: 680, elasticModulusMPa: 2800, creepKdef: 2.25},
+  { id: 'oak18', name: 'Roble macizo 18 mm', kind: 'solidwood', thicknessMm: 18, sheet: null, productKey: 'solid:oak18', densityKgM3: 700, elasticModulusMPa: 10000, creepKdef: 0.6, notes: 'Madera maciza: rediseñar uniones y permitir movimiento higroscópico; se cotiza por pie-tabla o pieza.' },
+  { id: 'hdf3', name: 'HDF 3 mm (respaldo)', kind: 'back_panel', thicknessMm: 3, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:hdf3', densityKgM3: 850, elasticModulusMPa: null, creepKdef: 2.25},
+  { id: 'hdf6', name: 'MDF/HDF 6 mm (respaldo / fondo cajón)', kind: 'back_panel', thicknessMm: 6, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:hdf6', densityKgM3: 800, elasticModulusMPa: null, creepKdef: 2.25},
+  { id: 'mel9', name: 'Melamina 9 mm (respaldo rígido)', kind: 'back_panel', thicknessMm: 9, sheet: { lengthMm: 2440, widthMm: 1220 }, productKey: 'board:mel9', densityKgM3: 680, elasticModulusMPa: null, creepKdef: 2.25},
 ];
 
 export const FINISHES: FinishDefinition[] = [

@@ -155,6 +155,7 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
           ))}
         </ul>
       </section>
+      <DimensionChecks plan={plan} project={project} moduleFilter={moduleFilter} onProject={onProject} />
       <section>
         <h3 className="mb-1 font-semibold">Inspección</h3>
         <div className="grid gap-1">
@@ -219,9 +220,10 @@ export function ExportTab({ project, dirty, onSave, revisionId }: { project: Pro
   };
   const items: { f: string; label: string; desc: string; extra?: Record<string, unknown> }[] = [
     { f: 'pdf', label: 'PDF de fabricación', desc: 'Expediente: isométrico, despiece, tableros, herrajes, incidencias, presupuesto, armado y QC.' },
-    { f: 'parts-csv', label: 'Despiece CSV', desc: 'UTF-8 con BOM; IDs, medidas, veta, cantos, material, estado.' },
+    { f: 'parts-csv', label: 'Despiece CSV', desc: 'UTF-8 con BOM; IDs, medida final y de corte, veta, cantos, material, estado.' },
     { f: 'quote-csv', label: 'Cotización CSV', desc: 'Líneas con proveedor, SKU, fecha, estado de precio y totales.' },
     { f: 'hardware-csv', label: 'Herrajes y herrería CSV', desc: 'Requerimientos con regla aplicada y validación.' },
+    { f: 'checks-csv', label: 'Verificación dimensional CSV', desc: 'Cada comprobación con valor esperado, calculado y resultado.' },
     { f: 'json', label: 'JSON versionado', desc: 'Proyecto + cálculo + acomodo + cotización (schemaVersion, calcVersion).' },
     { f: 'svg', label: 'SVG isométrico', desc: 'Vector con cotas en mm e IDs de pieza.' },
     { f: 'svg', label: 'SVG despiece separado', desc: 'Piezas separadas con etiquetas.', extra: { exploded: true } },
@@ -278,5 +280,49 @@ export function HistoryTab({ revisions, onCreate, onOpen, onRefresh, saved }: {
         </table>
       )}
     </div>
+  );
+}
+
+const CATEGORY_LABEL: Record<string, string> = { cierre: 'Cierre de medidas', apoyo: 'Apoyos', canto: 'Cantos', espesor: 'Espesores', herraje: 'Herrajes', flecha: 'Flecha', 'tamaño': 'Tamaños de taller', frentes: 'Frentes', peso: 'Peso' };
+const STATUS_TONE = { ok: 'ok', info: 'info', warning: 'warn', error: 'err' } as const;
+const STATUS_LABEL = { ok: 'Cumple', info: 'Info', warning: 'Revisar', error: 'No cumple' } as const;
+
+function DimensionChecks({ plan, project, moduleFilter, onProject }: { plan: ManufacturingPlan; project: Project; moduleFilter: string; onProject: (p: Project) => void }) {
+  const mf = project.manufacturing;
+  const set = (patch: Partial<typeof mf>) => onProject({ ...project, manufacturing: { ...mf, ...patch } });
+  const checks = plan.calc.modules.filter((m) => !moduleFilter || m.moduleId === moduleFilter).flatMap((m) => m.checks);
+  const order = { error: 0, warning: 1, info: 2, ok: 3 } as const;
+  const counts = { error: 0, warning: 0, info: 0, ok: 0 };
+  for (const c of checks) counts[c.status]++;
+  return (
+    <section className="grid gap-3" data-testid="dimension-checks">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-semibold">Verificación dimensional</h3>
+        {(['error', 'warning', 'info', 'ok'] as const).map((s) => <Badge key={s} tone={STATUS_TONE[s]}>{counts[s]} {STATUS_LABEL[s]}</Badge>)}
+      </div>
+      <p className="text-[12px] text-muted">Se recalcula con cada cambio: el mueble se reconstruye con las posiciones de cada pieza y se compara contra las medidas pedidas, los espesores, cantos, herrajes, flecha y límites del taller.</p>
+      <div className="grid max-w-4xl grid-cols-2 gap-2 md:grid-cols-4">
+        <label className="flex items-center gap-2 text-[12.5px] md:col-span-2"><input type="checkbox" checked={mf.edgeCompensation} onChange={(e) => set({ edgeCompensation: e.target.checked })} data-testid="edge-compensation" />Restar el espesor del canto en la medida de corte</label>
+        <NumberInput label="Repasado de canteadora por arista" suffix="mm" value={mf.premillMm} min={0} max={5} step={0.1} onChange={(v) => set({ premillMm: v })} hint="0 si la canteadora no pre-fresa" />
+        <NumberInput label="Flecha admisible: claro /" value={mf.sagLimitRatio} min={50} max={1000} onChange={(v) => set({ sagLimitRatio: v })} hint="200 = 0.5 % del claro" />
+        <NumberInput label="Ancho mínimo de corte" suffix="mm" value={mf.minPartWidthMm} min={0} max={200} onChange={(v) => set({ minPartWidthMm: v })} />
+        <NumberInput label="Mínimo para canteadora" suffix="mm" value={mf.minEdgebandWidthMm} min={0} max={300} onChange={(v) => set({ minEdgebandWidthMm: v })} />
+        <NumberInput label="Arista mínima canteable" suffix="mm" value={mf.minEdgebandLengthMm} min={0} max={600} onChange={(v) => set({ minEdgebandLengthMm: v })} />
+        <NumberInput label="Tolerancia de contacto" suffix="mm" value={mf.contactToleranceMm} min={0.1} max={5} step={0.1} onChange={(v) => set({ contactToleranceMm: v })} />
+      </div>
+      <div className="max-h-[480px] overflow-auto">
+        <table>
+          <thead><tr><th>Módulo</th><th>Tipo</th><th>Verificación</th><th>Esperado</th><th>Calculado</th><th>Resultado</th></tr></thead>
+          <tbody>{[...checks].sort((a, b) => order[a.status] - order[b.status]).map((c) => (
+            <tr key={c.id}>
+              <td>{c.moduleId}</td><td>{CATEGORY_LABEL[c.category] ?? c.category}</td><td className="whitespace-normal">{c.label}</td>
+              <td className="whitespace-normal text-muted">{c.expected}</td><td className="whitespace-normal">{c.actual}</td>
+              <td><Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <p className="text-[11.5px] text-muted">Densidad, módulo de elasticidad y fluencia de los tableros son valores típicos; para un cálculo definitivo use los de la ficha técnica del tablero comprado. La flecha supone entrepaño simplemente apoyado con carga repartida.</p>
+    </section>
   );
 }

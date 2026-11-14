@@ -173,6 +173,8 @@ export function Editor({ initial }: { initial: Project }) {
                       <Stat label="Modelos de corte" value={calc.totals.partModels} />
                       <Stat label="Tableros (acomodo)" value={plan.nesting.map((n) => `${n.sheetsRequired ?? '?'}× ${n.thicknessMm}mm`).join(' · ') || '—'} />
                       <Stat label="Conjunto" value={`${project.modules.reduce((s, m) => s + m.widthMm, 0)} mm de ancho`} />
+                      <Stat label="Peso de tableros" value={`${Math.round(calc.modules.reduce((s, m) => s + m.weightKg, 0) * 10) / 10} kg`} />
+                      <Stat label="Verificación dimensional" value={<span data-testid="checks-summary">{calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'error').length ? `${calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'error').length} error(es)` : calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'warning').length ? `${calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'warning').length} aviso(s)` : 'Todo cuadra'}</span>} />
                     </div>
                     {calc.issues.filter((i) => i.severity === 'error').map((i, k) => <Alert key={k} tone="err">{i.moduleId ? `${i.moduleId}: ` : ''}{i.message}</Alert>)}
                     <Viewer project={project} calc={calc} selected={selectedPart} onSelect={setSelectedPart} />
