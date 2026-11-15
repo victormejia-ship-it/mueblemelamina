@@ -1,5 +1,5 @@
 import type {
-  Box3, EdgeName, HardwareRequirement, Issue, MachiningOperation, MachiningPattern, Mm, PanelPart, PartRole, ValidationStatus,
+  Box3, EdgeName, HardwareRequirement, Issue, MachiningOperation, MachiningPattern, ManufacturingSettings, Mm, PanelPart, PartRole, ValidationStatus,
 } from '../types';
 
 /** Redondeo a centésimas de mm para evitar ruido de coma flotante en medidas de corte. */
@@ -8,6 +8,22 @@ export const r2 = (n: number): number => Math.round(n * 100) / 100;
 export const box = (x0: Mm, x1: Mm, y0: Mm, y1: Mm, z0: Mm, z1: Mm): Box3 => ({
   x0: r2(x0), x1: r2(x1), y0: r2(y0), y1: r2(y1), z0: r2(z0), z1: r2(z1),
 });
+
+/**
+ * Medida de corte a partir de la medida final (de diseño).
+ * L1/L2 son aristas a lo largo del largo: su canto reduce el ANCHO. A1/A2 reducen el LARGO.
+ * Con compensación: corte = final − Σ espesor de canto + Σ repasado de la canteadora (por arista canteada).
+ */
+export function cutDimensions(
+  lengthMm: Mm, widthMm: Mm, banded: EdgeName[], bandThicknessMm: Mm,
+  settings: Pick<ManufacturingSettings, 'edgeCompensation' | 'premillMm'>,
+): { cutLengthMm: Mm; cutWidthMm: Mm } {
+  if (!settings.edgeCompensation || banded.length === 0) return { cutLengthMm: r2(lengthMm), cutWidthMm: r2(widthMm) };
+  const per = settings.premillMm - bandThicknessMm;
+  const onLength = banded.filter((e) => e === 'A1' || e === 'A2').length;
+  const onWidth = banded.filter((e) => e === 'L1' || e === 'L2').length;
+  return { cutLengthMm: r2(lengthMm + onLength * per), cutWidthMm: r2(widthMm + onWidth * per) };
+}
 
 export interface PartInit {
   code: string;
@@ -34,6 +50,9 @@ export class ModuleBuilder {
     readonly moduleId: string,
     readonly finishId: string,
     readonly edgeBandId: string | null,
+    /** Espesor del tapacanto (mm) para compensar la medida de corte. */
+    readonly edgeBandThicknessMm: Mm = 0,
+    readonly settings: Pick<ManufacturingSettings, 'edgeCompensation' | 'premillMm'> = { edgeCompensation: false, premillMm: 0 },
   ) {}
 
   part(p: PartInit): PanelPart {
@@ -41,6 +60,7 @@ export class ModuleBuilder {
     if (this.parts.some((x) => x.id === id)) throw new Error(`ID de pieza duplicado: ${id}`);
     const edgeBand: PanelPart['edgeBand'] = {};
     if (this.edgeBandId) for (const e of p.edges) edgeBand[e] = this.edgeBandId;
+    const { cutLengthMm, cutWidthMm } = cutDimensions(p.lengthMm, p.widthMm, Object.keys(edgeBand) as EdgeName[], this.edgeBandThicknessMm, this.settings);
     const part: PanelPart = {
       id,
       moduleId: this.moduleId,
@@ -51,6 +71,8 @@ export class ModuleBuilder {
       lengthMm: r2(p.lengthMm),
       widthMm: r2(p.widthMm),
       thicknessMm: p.thicknessMm,
+      cutLengthMm,
+      cutWidthMm,
       grainAxis: p.grainAxis,
       edgeBand,
       materialId: p.materialId,

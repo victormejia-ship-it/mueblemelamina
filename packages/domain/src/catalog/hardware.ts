@@ -16,13 +16,19 @@ export const HARDWARE: HardwareProduct[] = [
   {
     id: 'hinge-generic-110', category: 'hinge', name: 'Bisagra cazoleta 35 mm 110° sobrepuesta (genérica)', manufacturer: null, sku: null,
     productKey: 'hw:hinge_overlay_110', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation',
-    params: { hingeRules: GENERIC_HINGE_RULES }, machiningPatternId: 'hinge-cup-35',
-    notes: 'Seleccionar SKU con ficha técnica antes de perforar; distancia de cazoleta no se asume.',
+    params: { hingeRules: GENERIC_HINGE_RULES, doorThicknessRangeMm: [15, 22] }, machiningPatternId: 'hinge-cup-35',
+    notes: 'Seleccionar SKU con ficha técnica antes de perforar; distancia de cazoleta no se asume. Rango de espesor de puerta 15–22 mm: valor típico de bisagra de cazoleta Ø35, verificar.',
+  },
+  {
+    id: 'hinge-generic-110-half', category: 'hinge', name: 'Bisagra cazoleta 35 mm 110° semi-solape / acodada (genérica)', manufacturer: null, sku: null,
+    productKey: 'hw:hinge_half_overlay_110', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation',
+    params: { hingeRules: GENERIC_HINGE_RULES, doorThicknessRangeMm: [15, 22] }, machiningPatternId: 'hinge-cup-35',
+    notes: 'Para hojas que giran sobre un divisor compartido con otra hoja. Validar solape con la ficha del fabricante.',
   },
   {
     id: 'hinge-samet-master110', category: 'hinge', name: 'Bisagra Samet Master 110° cierre suave', manufacturer: 'Samet', sku: 'SAM1010041150',
     productKey: 'hw:samet:SAM1010041150', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation',
-    params: { hingeRules: GENERIC_HINGE_RULES }, machiningPatternId: 'hinge-cup-35',
+    params: { hingeRules: GENERIC_HINGE_RULES, doorThicknessRangeMm: [15, 22] }, machiningPatternId: 'hinge-cup-35',
     notes: 'Referencia tomada del prototipo; adjuntar ficha del fabricante para validar tabla de cantidad y mecanizado.',
   },
   // Correderas
@@ -52,7 +58,7 @@ export const HARDWARE: HardwareProduct[] = [
   { id: 'screw-spax-4x15', category: 'screw', name: 'Tornillo Spax 4 × 15 mm (herrajes/respaldo)', manufacturer: 'Spax', sku: 'SP044015', productKey: 'hw:spax:SP044015', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'shelf-pin-5', category: 'shelf_pin', name: 'Soporte de entrepaño Ø5 mm', manufacturer: null, sku: null, productKey: 'hw:shelf_pin5', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation', machiningPatternId: 'shelf-pin-line-32' },
   { id: 'handle-generic', category: 'handle', name: 'Jaladera (modelo por definir)', manufacturer: null, sku: null, productKey: 'hw:handle_generic', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
-  { id: 'leveler-100', category: 'leveler', name: 'Pata niveladora plástica 100–150 mm', manufacturer: null, sku: null, productKey: 'hw:leveler100', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'leveler-100', category: 'leveler', name: 'Pata niveladora plástica 100–150 mm', manufacturer: null, sku: null, productKey: 'hw:leveler100', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation', params: { heightRangeMm: [100, 150] } },
   { id: 'plinth-clip', category: 'plinth_clip', name: 'Clip para zoclo', manufacturer: null, sku: null, productKey: 'hw:plinth_clip', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'wall-anchor-antitip', category: 'wall_anchor', name: 'Anclaje antivuelco a muro (taquete + escuadra/cable)', manufacturer: null, sku: null, productKey: 'hw:antitip_anchor', unit: 'juego', technicalDatasheetUrl: null, validationStatus: 'pending_validation', notes: 'El taquete depende del tipo de muro (block, concreto, tablaroca). Validar en sitio.' },
   { id: 'cabinet-hanger', category: 'wall_anchor', name: 'Colgador regulable para gabinete aéreo', manufacturer: null, sku: null, productKey: 'hw:cabinet_hanger', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation', notes: 'Capacidad de carga y mecanizado según fabricante; riel/taquete según muro.' },

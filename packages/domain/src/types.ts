@@ -46,6 +46,8 @@ export interface FamilyDefaults {
   baseType: BaseType;
   baseHeightMm: Mm;
   mount: MountType;
+  /** Carga de diseño sobre entrepaños/cubierta (kg/m²) para el cálculo de flecha. */
+  shelfLoadKgM2: number;
 }
 
 export interface FamilyDefinition {
@@ -70,8 +72,12 @@ export interface MaterialDefinition {
   sheet: { lengthMm: Mm; widthMm: Mm } | null;
   /** Clave de producto para emparejar ofertas de proveedores. */
   productKey: string;
-  /** Luz libre orientativa de entrepaño sin apoyo intermedio; requiere validación por carga. */
-  maxShelfSpanMm: Mm | null;
+  /** Densidad típica (kg/m³) para peso de piezas. Verificar con ficha del tablero. */
+  densityKgM3: number;
+  /** Módulo de elasticidad típico en flexión (MPa); null = no estructural (respaldos). */
+  elasticModulusMPa: number | null;
+  /** Factor de fluencia kdef (deformación diferida bajo carga permanente; referencia Eurocódigo 5, clase de servicio 1). */
+  creepKdef: number;
   notes?: string;
 }
 
@@ -119,6 +125,14 @@ export interface HardwareProduct {
     maxLoadKg?: number;
     /** Bisagras: tabla de cantidad por alto de puerta (fabricante). */
     hingeRules?: HingeRule[];
+    /** Bisagras: espesor de puerta admitido [mín, máx] en mm. */
+    doorThicknessRangeMm?: [Mm, Mm];
+    /** Bisagras: peso máximo de puerta por bisagra (kg), según tabla del fabricante. */
+    maxDoorWeightKgPerHinge?: number;
+    /** Patas niveladoras / colgadores: rango de altura de ajuste [mín, máx] en mm. */
+    heightRangeMm?: [Mm, Mm];
+    /** Patas / colgadores: capacidad por pieza (kg). */
+    maxLoadKgEach?: number;
   };
   machiningPatternId?: string;
   notes?: string;
@@ -192,6 +206,8 @@ export interface ModuleSpec {
   baseType: BaseType;
   baseHeightMm: Mm;
   mount: MountType;
+  /** Carga de diseño en entrepaños (kg/m²); null = la de la familia. */
+  shelfLoadKgM2: number | null;
   joinery: Joinery;
   hingeProductId: string | null;
   slideProductId: string | null;
@@ -233,6 +249,24 @@ export interface PricingSettings {
   manualCosts: ManualCost[];
 }
 
+/** Parámetros de taller que afectan medidas de corte y validaciones (editables por proyecto). */
+export interface ManufacturingSettings {
+  /** Restar el espesor del tapacanto a la medida de corte (medida final = medida de diseño). */
+  edgeCompensation: boolean;
+  /** Repasado/pre-fresado de la canteadora por arista canteada (mm que se agregan al corte). */
+  premillMm: Mm;
+  /** Criterio de flecha admisible: claro / N (p. ej. 200 = 0.5 % del claro). */
+  sagLimitRatio: number;
+  /** Ancho mínimo de pieza que el taller corta con seguridad. */
+  minPartWidthMm: Mm;
+  /** Dimensión mínima transversal para pasar una pieza por la canteadora. */
+  minEdgebandWidthMm: Mm;
+  /** Largo mínimo de una arista para cantearla en máquina. */
+  minEdgebandLengthMm: Mm;
+  /** Tolerancia para considerar que dos piezas se tocan (verificación de apoyos). */
+  contactToleranceMm: Mm;
+}
+
 export interface CutSettings {
   kerfMm: Mm;
   trimMarginMm: Mm;
@@ -265,6 +299,7 @@ export interface Project {
   modules: ModuleSpec[];
   pricing: PricingSettings;
   cut: CutSettings;
+  manufacturing: ManufacturingSettings;
   inspection: InspectionRecord;
   approval: Approval | null;
   status: ProjectStatus;
@@ -287,9 +322,13 @@ export interface PanelPart {
   name: string;
   role: PartRole;
   quantity: number;
+  /** Medida final (de diseño), con tapacanto incluido. Es la que ocupa la pieza armada. */
   lengthMm: Mm;
   widthMm: Mm;
   thicknessMm: Mm;
+  /** Medida de corte: final − espesor de canto en aristas canteadas + repasado (si la compensación está activa). */
+  cutLengthMm: Mm;
+  cutWidthMm: Mm;
   grainAxis: 'length' | 'width' | 'none';
   edgeBand: Partial<Record<EdgeName, string>>;
   materialId: string;
@@ -354,6 +393,21 @@ export interface Issue {
   partId?: string;
 }
 
+export type CheckCategory = 'cierre' | 'apoyo' | 'canto' | 'espesor' | 'herraje' | 'flecha' | 'tamaño' | 'frentes' | 'peso';
+export type CheckStatus = 'ok' | 'info' | 'warning' | 'error';
+
+/** Resultado de una verificación dimensional (esperado vs. calculado). */
+export interface DimensionCheck {
+  id: string;
+  moduleId: string;
+  category: CheckCategory;
+  label: string;
+  expected: string;
+  actual: string;
+  status: CheckStatus;
+  partId?: string;
+}
+
 export interface ModuleResult {
   moduleId: string;
   /** Desplazamiento del módulo en el conjunto (X). */
@@ -370,6 +424,10 @@ export interface ModuleResult {
   theoreticalDiagonalMm: Mm | null;
   carcassDepthMm: Mm | null;
   overallHeightMm: Mm;
+  /** Verificaciones dimensionales del módulo. */
+  checks: DimensionCheck[];
+  /** Peso estimado de tableros (kg), con densidades típicas. */
+  weightKg: number;
 }
 
 export interface EdgeBandTotal {

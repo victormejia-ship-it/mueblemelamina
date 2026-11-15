@@ -1,5 +1,5 @@
 import { DEFAULT_CATALOG } from '@ms/domain';
-import { buildPdf, cutMapsSvg, hardwareCsv, partsCsv, projectJson, projectMermaid, projectSvg, quoteCsv, type CsvSeparator } from '@ms/export';
+import { buildPdf, checksCsv, cutMapsSvg, hardwareCsv, partsCsv, projectJson, projectMermaid, projectSvg, quoteCsv, type CsvSeparator } from '@ms/export';
 import { getSession } from '@/server/auth';
 import { BadRequest, handle, readJson } from '@/server/http';
 import { loadPlan } from '@/server/service';
@@ -7,7 +7,7 @@ import { loadPlan } from '@/server/service';
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ format: string }> };
 
-const FORMATS = ['json', 'parts-csv', 'quote-csv', 'hardware-csv', 'svg', 'cut-svg', 'mermaid', 'pdf'] as const;
+const FORMATS = ['json', 'parts-csv', 'quote-csv', 'hardware-csv', 'checks-csv', 'svg', 'cut-svg', 'mermaid', 'pdf'] as const;
 
 export const POST = handle(async (req: Request, ctx: Ctx) => {
   const s = getSession(req);
@@ -24,6 +24,7 @@ export const POST = handle(async (req: Request, ctx: Ctx) => {
     case 'parts-csv': return file(partsCsv(plan, DEFAULT_CATALOG, sep), 'text/csv; charset=utf-8', `${base}-despiece.csv`);
     case 'quote-csv': return file(quoteCsv(plan, sep), 'text/csv; charset=utf-8', `${base}-cotizacion.csv`);
     case 'hardware-csv': return file(hardwareCsv(plan, sep), 'text/csv; charset=utf-8', `${base}-herrajes.csv`);
+    case 'checks-csv': return file(checksCsv(plan, sep), 'text/csv; charset=utf-8', `${base}-verificacion.csv`);
     case 'svg': return file(projectSvg(project, plan, DEFAULT_CATALOG, { view: body.view ?? 'iso', exploded: !!body.exploded, showIds: !!body.exploded }), 'image/svg+xml', `${base}-${body.view ?? 'iso'}.svg`);
     case 'cut-svg': {
       const maps = cutMapsSvg(plan);

@@ -18,16 +18,17 @@ export function PartsTab({ plan, selected, onSelect }: { plan: ManufacturingPlan
         <Stat label="Piezas totales" value={<span data-testid="stat-pieces">{calc.totals.panelCount}</span>} />
         <Stat label="Modelos de corte" value={calc.totals.partModels} />
         <Stat label="Área de tablero" value={`${calc.totals.panelAreaM2} m²`} />
+        <Stat label="Peso de tableros" value={`${Math.round(calc.modules.reduce((s, m) => s + m.weightKg, 0) * 10) / 10} kg`} />
         {calc.edgeBands.map((e) => <Stat key={e.edgeBandId} label={`Canto ${L.edgeBand(e.edgeBandId).name}`} value={`${(e.netLengthMm / 1000).toFixed(2)} m neto · ${(e.purchaseLengthMm / 1000).toFixed(2)} m compra`} />)}
       </div>
       <div className="max-h-[560px] overflow-auto">
         <table data-testid="parts-table">
-          <thead><tr><th>ID</th><th>Pieza</th><th className="num">Cant.</th><th className="num">Largo</th><th className="num">Ancho</th><th className="num">Esp.</th><th>Veta</th><th>L1</th><th>L2</th><th>A1</th><th>A2</th><th>Material</th><th>Acabado</th><th>Estado</th><th className="num">Mec.</th><th>Observaciones</th></tr></thead>
+          <thead><tr><th>ID</th><th>Pieza</th><th className="num">Cant.</th><th className="num">Final largo</th><th className="num">Final ancho</th><th className="num">Esp.</th><th className="num">Corte largo</th><th className="num">Corte ancho</th><th>Veta</th><th>L1</th><th>L2</th><th>A1</th><th>A2</th><th>Material</th><th>Acabado</th><th>Estado</th><th className="num">Mec.</th><th>Observaciones</th></tr></thead>
           <tbody>
             {calc.parts.map((p) => (
               <tr key={p.id} onClick={() => onSelect(p.id === selected ? null : p.id)} className={`cursor-pointer ${p.id === selected ? 'bg-[#2b4252]' : 'hover:bg-[#1f2d39]'}`} aria-selected={p.id === selected}>
                 <td className="font-mono text-[11px]">{p.id}</td><td>{p.name}</td><td className="num">{p.quantity}</td>
-                <td className="num">{p.lengthMm}</td><td className="num">{p.widthMm}</td><td className="num">{p.thicknessMm}</td><td>{p.grainAxis === 'length' ? 'Largo' : p.grainAxis === 'width' ? 'Ancho' : '—'}</td>
+                <td className="num">{p.lengthMm}</td><td className="num">{p.widthMm}</td><td className="num">{p.thicknessMm}</td><td className="num font-semibold">{p.cutLengthMm}</td><td className="num font-semibold">{p.cutWidthMm}</td><td>{p.grainAxis === 'length' ? 'Largo' : p.grainAxis === 'width' ? 'Ancho' : '—'}</td>
                 {(['L1', 'L2', 'A1', 'A2'] as const).map((e) => <td key={e}>{p.edgeBand[e] ? '●' : '○'}</td>)}
                 <td>{L.material(p.materialId).name}</td><td>{L.finish(p.finishId).name}</td>
                 <td><Badge tone={vTone(p.validationStatus)}>{vLabel[p.validationStatus]}</Badge></td>
@@ -38,7 +39,7 @@ export function PartsTab({ plan, selected, onSelect }: { plan: ManufacturingPlan
           </tbody>
         </table>
       </div>
-      <p className="text-[11.5px] text-muted">Medidas nominales de corte antes de tapacanto (sin compensación). L1/L2 = aristas del largo; A1/A2 = aristas del ancho; ● con canto.</p>
+      <p className="text-[11.5px] text-muted">Medida final = medida armada con tapacanto. Medida de corte = la que se corta en la seccionadora: final − espesor de canto en cada arista canteada (+ repasado configurado en Calidad). L1/L2 = aristas del largo (reducen el ancho); A1/A2 = aristas del ancho (reducen el largo); ● con canto.</p>
     </div>
   );
 }

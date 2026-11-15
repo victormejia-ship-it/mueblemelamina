@@ -6,6 +6,8 @@ export * from './engine/project';
 export * from './engine/nesting';
 export * from './engine/assembly';
 export * from './engine/quality';
+export * from './engine/structural';
+export * from './engine/verify';
 export * from './project/factory';
 export * from './project/schema';
 export * from './pricing/quote';

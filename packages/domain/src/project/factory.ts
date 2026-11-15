@@ -1,5 +1,16 @@
 import { catalogLookup, type Catalog } from '../catalog';
-import { SCHEMA_VERSION, type ModuleSpec, type PricingSettings, type Project } from '../types';
+import { SCHEMA_VERSION, type ManufacturingSettings, type ModuleSpec, type PricingSettings, type Project } from '../types';
+
+/** Valores de taller por defecto (editables por proyecto). */
+export const DEFAULT_MANUFACTURING: ManufacturingSettings = {
+  edgeCompensation: true,
+  premillMm: 0,
+  sagLimitRatio: 200,
+  minPartWidthMm: 30,
+  minEdgebandWidthMm: 50,
+  minEdgebandLengthMm: 150,
+  contactToleranceMm: 1.5,
+};
 
 export const DEFAULT_MANUAL_COSTS: PricingSettings['manualCosts'] = [
   { key: 'service:cutting', label: 'Servicio de corte (dimensionado)', applies: true, amountCents: null, taxIncluded: false },
@@ -53,6 +64,7 @@ export function createModule(familyId: string, catalog: Catalog, id: string, lab
     baseType: f.defaults.baseType,
     baseHeightMm: f.defaults.baseHeightMm,
     mount: f.defaults.mount,
+    shelfLoadKgM2: null,
     joinery: 'cam',
     hingeProductId: null,
     slideProductId: null,
@@ -86,6 +98,7 @@ export function createProject(input: NewProjectInput, catalog: Catalog): Project
     modules: [createModule(input.familyId, catalog, 'M01')],
     pricing: defaultPricing(),
     cut: { kerfMm: 4, trimMarginMm: 10 },
+    manufacturing: { ...DEFAULT_MANUFACTURING },
     inspection: { checklist: {}, diagonals: {}, diagonalToleranceMm: 2, notes: '' },
     approval: null,
     status: 'DRAFT_NOT_RELEASED_FOR_MANUFACTURING',
