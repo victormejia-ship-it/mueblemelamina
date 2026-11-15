@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DEFAULT_CATALOG, OFFER_CSV_COLUMNS, SUPPLIERS, formatMXN, isExpired, netPackCents, type PriceStatus, type SupplierOffer } from '@ms/domain';
 import { errorMessage } from '@/lib/api';
 import { getDataClient } from '@/lib/data';
-import { Alert, Badge, Button, EmptyState, Field, Panel, type Tone } from './ui';
+import { Alert, Badge, Button, EmptyState, Field, Hint, Panel, type Tone } from './ui';
 
 export const PRICE_STATUS_TONE: Record<PriceStatus, Tone> = {
   PUBLICADO_VERIFICADO: 'ok', COTIZADO: 'ok', CAPTURADO_MANUAL: 'info', ESTIMADO: 'warn', PENDIENTE: 'neutral', VENCIDO: 'err',
@@ -146,7 +146,7 @@ export function Suppliers() {
           </form>
         </Panel>
         <Panel title="Importar CSV de ofertas" actions={<a className="text-[12px] text-[#bce8f2] underline" download="plantilla_ofertas.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent('﻿' + template)}`}>Descargar plantilla</a>}>
-          <p className="mb-2 text-[12px] text-muted">Separador «,» o «;» detectado automáticamente. Importes en formato 1,234.50 o 1.234,50. Se valida estado, IVA, fuente y se de-duplica por proveedor + SKU + presentación + fecha. El histórico no se sobrescribe.</p>
+          <Hint label="Formato">Separador «,» o «;» detectado automáticamente. Importes en formato 1,234.50 o 1.234,50. Se valida estado, IVA, fuente y se de-duplica por proveedor + SKU + presentación + fecha. El histórico no se sobrescribe.</Hint>
           <textarea aria-label="Contenido CSV" rows={12} value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={template} className="font-mono text-[11.5px]" />
           <div className="mt-2 flex flex-wrap gap-2">
             <label className="cursor-pointer rounded-lg border border-[#496072] bg-[#2a3a49] px-3 py-1.5 text-[13px] font-semibold">Elegir archivo…<input type="file" accept=".csv,text/csv" className="sr-only" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} /></label>

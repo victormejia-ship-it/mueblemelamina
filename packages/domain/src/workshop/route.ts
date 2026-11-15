@@ -18,6 +18,8 @@ export interface RouteStation {
   output: string;
   equipmentIds: string[];
   metrics: RouteMetric[];
+  /** 1–3 cifras clave en pocas palabras (para ver de un vistazo). */
+  highlights: string[];
   /** Avisos que el operador debe ver en esa estación. */
   alerts: string[];
   /** Puede hacerse en paralelo con la carpintería. */
@@ -76,6 +78,21 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
   const wallModules = project.modules.filter((m) => m.mount === 'wall').length;
   const mf = project.manufacturing;
 
+  const totalSheets = plan.nesting.reduce((s, n) => s + (n.sheetsRequired ?? n.areaEstimate.sheetsEstimated), 0);
+  const edgeM = bands.reduce((s, b) => s + b.e.purchaseLengthMm, 0) / 1000;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  const hl: Record<StationId, string[]> = {
+    preparacion: [plural(project.modules.length, 'módulo', 'módulos'), plural(thicknesses.length, 'espesor', 'espesores')],
+    corte: [plural(calc.totals.panelCount, 'pieza', 'piezas'), plural(totalSheets, 'tablero', 'tableros')],
+    canteado: [`${fmt(edgeM, 1)} m de canto`, plural(bands.reduce((s, b) => s + b.e.segments, 0), 'arista', 'aristas')],
+    mecanizado: [cups ? plural(cups, 'cazoleta', 'cazoletas') : '', cams ? plural(cams, 'excéntrico', 'excéntricos') : '', pins ? plural(pins, 'soporte', 'soportes') : ''].filter(Boolean).slice(0, 3),
+    armado: [plural(project.modules.length, 'caja', 'cajas'), `diagonal ±${project.inspection.diagonalToleranceMm} mm`],
+    herreria: plan.steel.map((s) => plural(s.layout.bars.length, 'barra', 'barras')).slice(0, 2),
+    frentes: [hingeTotal ? plural(hingeTotal, 'bisagra', 'bisagras') : '', slides ? plural(slides, 'corredera', 'correderas') : '', handles ? plural(handles, 'jaladera', 'jaladeras') : ''].filter(Boolean),
+    calidad: [`${checks.filter((c) => c.status === 'ok').length} ✓`, `${checks.filter((c) => c.status === 'warning').length + checks.filter((c) => c.status === 'error').length} por revisar`],
+    empaque: [`${fmt(totalWeight, 0)} kg`, heavy.length ? `${heavy.length} pesados` : 'sin pesados'],
+    instalacion: [anchors ? plural(anchors, 'anclaje', 'anclajes') : '', levelers ? plural(levelers, 'pata', 'patas') : ''].filter(Boolean),
+  };
   const stationData: Record<StationId, { include: boolean; equipment: string[]; metrics: RouteMetric[]; alerts: string[]; parallel?: boolean }> = {
     preparacion: {
       include: true, equipment: ['flexometro', 'calibrador', 'epp'],
@@ -121,7 +138,7 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
         { label: 'Conectores', value: `${hwQty((c) => c === 'cam_connector')} excéntricos · ${hwQty((c) => c === 'dowel')} taquetes` },
         ...calc.modules.filter((m) => m.theoreticalDiagonalMm).map((m) => ({ label: `Diagonal teórica ${m.moduleId}`, value: `${m.theoreticalDiagonalMm} mm` })),
       ],
-      alerts: [`Diferencia de diagonales ≤ ${project.inspection.diagonalToleranceMm} mm antes de fijar el respaldo.`],
+      alerts: [],
     },
     herreria: {
       include: hasSteel, parallel: true, equipment: ['tronzadora', 'soldadora', 'pintura-metal'],
@@ -168,7 +185,7 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
   let num = 0;
   const stations: RouteStation[] = STATIONS.filter((s) => stationData[s.id].include).map((s) => {
     const d = stationData[s.id];
-    return { ...s, number: ++num, equipmentIds: d.equipment, metrics: d.metrics, alerts: d.alerts, parallel: !!d.parallel };
+    return { ...s, number: ++num, equipmentIds: d.equipment, metrics: d.metrics, highlights: hl[s.id], alerts: d.alerts, parallel: !!d.parallel };
   });
 
   // Equipo necesario

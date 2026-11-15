@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </header>
         <main id="main" className="px-3 py-4 sm:px-6"><AuthGate>{children}</AuthGate></main>
         <footer className="no-print px-6 pb-6 pt-2 text-center text-[11.5px] text-muted">
-          Medidas nominales en mm; cantos sin compensar salvo política explícita. Las listas no sustituyen cálculo estructural, planos de instalación ni fichas de herrajes. Sin afiliación con proveedores listados.
+          Medidas en mm · Revisar en taller antes de fabricar · Sin afiliación con proveedores
         </footer>
         </AuthProvider>
       </body>

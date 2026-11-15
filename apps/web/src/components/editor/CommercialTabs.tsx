@@ -6,7 +6,8 @@ import {
 } from '@ms/domain';
 import { api, errorMessage } from '@/lib/api';
 import { IS_FIREBASE, getDataClient, type ExportFormat } from '@/lib/data';
-import { Alert, Badge, Button, EmptyState, Stat, quoteTone, releaseLabel, releaseTone, severityLabel, severityTone } from '../ui';
+import { Alert, Badge, BigStat, Button, EmptyState, Hint, More, Stat, quoteTone, releaseLabel, releaseTone, severityLabel, severityTone } from '../ui';
+import { CircleCheck, CircleX, TriangleAlert } from '../icons';
 import { PRICE_STATUS_TONE } from '../Suppliers';
 import { MoneyInput, NumberInput, SelectInput } from './inputs';
 
@@ -53,7 +54,7 @@ export function OffersTab({ plan, project, offers, today, onPricing }: { plan: M
           </section>
         );
       })}
-      <p className="text-[11.5px] text-muted">Comparación por clave de producto equivalente (misma especificación). Precios normalizados a neto sin IVA según «IVA incluido/excluido»; la compra se redondea a presentaciones completas. Flete y disponibilidad: registrar en notas de la oferta o como costo manual.</p>
+      <Hint>Comparación por clave de producto equivalente (misma especificación). Precios normalizados a neto sin IVA según «IVA incluido/excluido»; la compra se redondea a presentaciones completas. Flete y disponibilidad: registrar en notas de la oferta o como costo manual.</Hint>
     </div>
   );
 }
@@ -140,24 +141,31 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px]">Estado de liberación:</span>
-        <Badge tone={releaseTone(plan.calc.releaseStatus)}><span data-testid="release-status">{releaseLabel[plan.calc.releaseStatus]}</span></Badge>
-        {(['error', 'blocker', 'warning', 'info'] as const).map((s) => <Badge key={s} tone={severityTone(s)}>{plan.calc.issues.filter((i) => i.severity === s).length} {severityLabel[s]}</Badge>)}
+        <span hidden data-testid="release-status">{releaseLabel[plan.calc.releaseStatus]}</span>
       </div>
-      <section>
-        <div className="mb-2 flex items-center gap-2">
-          <h3 className="font-semibold">Errores, bloqueos y advertencias</h3>
-          <select aria-label="Filtrar por módulo" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)} className="!w-48"><option value="">Todos los módulos</option>{project.modules.map((m) => <option key={m.id} value={m.id}>{m.id} · {m.label}</option>)}</select>
+      <DimensionChecks plan={plan} project={project} moduleFilter={moduleFilter} onProject={onProject} />
+      <section className="grid gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-[15px] font-bold">Pendientes del proyecto</h3>
+          <select aria-label="Filtrar por módulo" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)} className="!w-44"><option value="">Todos los módulos</option>{project.modules.map((m) => <option key={m.id} value={m.id}>{m.id} · {m.label}</option>)}</select>
         </div>
         <ul className="grid gap-1.5" data-testid="issues-list">
-          {[...issues].sort((a, b) => order[a.severity] - order[b.severity]).map((i, k) => (
-            <li key={k} className="flex gap-2 text-[12.5px]"><Badge tone={severityTone(i.severity)}>{severityLabel[i.severity]}</Badge><span><code className="text-[11px] text-muted">{i.code}</code>{i.moduleId ? ` · ${i.moduleId}` : ''} — {i.message}</span></li>
+          {[...issues].filter((i) => i.severity === 'error' || i.severity === 'blocker').sort((a, b) => order[a.severity] - order[b.severity]).map((i, k) => (
+            <li key={k} className="flex gap-2 text-[12.5px]"><Badge tone={severityTone(i.severity)}>{severityLabel[i.severity]}</Badge><span>{i.moduleId ? <strong>{i.moduleId} · </strong> : null}{i.message}</span></li>
           ))}
+          {!issues.some((i) => i.severity === 'error' || i.severity === 'blocker') && <li className="text-[13px] text-ok">Sin errores ni validaciones pendientes.</li>}
         </ul>
+        {issues.some((i) => i.severity === 'warning' || i.severity === 'info') && (
+          <More summary={<>{issues.filter((i) => i.severity === 'warning').length} advertencias · {issues.filter((i) => i.severity === 'info').length} notas</>}>
+            <ul className="grid gap-1.5">
+              {[...issues].filter((i) => i.severity === 'warning' || i.severity === 'info').sort((a, b) => order[a.severity] - order[b.severity]).map((i, k) => (
+                <li key={k} className="flex gap-2 text-[12.5px]"><Badge tone={severityTone(i.severity)}>{severityLabel[i.severity]}</Badge><span>{i.moduleId ? <strong>{i.moduleId} · </strong> : null}{i.message} <code className="text-[10.5px] text-muted">{i.code}</code></span></li>
+              ))}
+            </ul>
+          </More>
+        )}
       </section>
-      <DimensionChecks plan={plan} project={project} moduleFilter={moduleFilter} onProject={onProject} />
-      <section>
-        <h3 className="mb-1 font-semibold">Inspección</h3>
+      <More summary={<>Checklist de inspección · {QC_CHECKLIST.filter((c) => insp.checklist[c.id]).length} de {QC_CHECKLIST.length}</>}>
         <div className="grid gap-1">
           {QC_CHECKLIST.map((c, i) => (
             <label key={c.id} className="flex items-center gap-2 text-[13px]">
@@ -165,9 +173,8 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
             </label>
           ))}
         </div>
-      </section>
-      <section>
-        <h3 className="mb-1 font-semibold">Diagonales de caja</h3>
+      </More>
+      <More summary={<>Diagonales medidas · {diagonalChecks(project, plan.calc).filter((d) => d.result === 'PASA').length} de {plan.calc.modules.length} pasan</>}>
         <div className="max-w-[200px]"><NumberInput label="Tolerancia de diferencia" suffix="mm" value={insp.diagonalToleranceMm} min={0} max={20} step={0.5} onChange={(v) => onProject({ ...project, inspection: { ...insp, diagonalToleranceMm: v } })} hint="Default editable, no norma" /></div>
         <table className="mt-2">
           <thead><tr><th>Módulo</th><th className="num">Teórica</th><th>Diagonal 1 (mm)</th><th>Diagonal 2 (mm)</th><th className="num">Diferencia</th><th>Resultado</th></tr></thead>
@@ -188,10 +195,9 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
             );
           })}</tbody>
         </table>
-      </section>
+      </More>
       <section className="rounded-xl border border-line p-3">
-        <h3 className="mb-1 font-semibold">Aprobación documentada</h3>
-        <p className="mb-2 text-[12px] text-muted">La liberación requiere cero errores. Si hay elementos pendientes de validación (herrajes, mecanizado, herrería, anclajes), la aprobación debe incluir la evidencia (fichas, cálculo estructural, folios). Nada se presenta como listo para CNC o estructura suspendida sin esta aprobación.</p>
+        <div className="mb-1 flex items-center gap-2"><h3 className="font-semibold">Aprobación</h3><Hint>La liberación requiere cero errores. Si hay pendientes de validación (herrajes, mecanizado, herrería, anclajes), anota la evidencia: fichas, cálculo estructural o folios.</Hint></div>
         {project.approval ? (
           <div className="flex flex-wrap items-center gap-2 text-[13px]">
             <span>Aprobado por <strong>{project.approval.approvedBy}</strong> el {project.approval.approvedAt.slice(0, 10)}.</span>
@@ -235,7 +241,7 @@ export function ExportTab({ project, dirty, onSave, revisionId }: { project: Pro
   return (
     <div className="grid gap-3">
       {revisionId && <Alert tone="info">Exportando la revisión {revisionId} (congelada).</Alert>}
-      {dirty && !revisionId && <Alert tone="warn">Hay cambios sin guardar: se guardarán antes de exportar (la exportación se calcula desde lo guardado).</Alert>}
+      {dirty && !revisionId && <Alert tone="warn">Se guardará antes de exportar.</Alert>}
       <div className="max-w-xs"><SelectInput label="Separador CSV" value={sep} onChange={setSep} options={[{ value: ';', label: '; (Excel es-MX, coma decimal)' }, { value: ',', label: ', (estándar, punto decimal)' }]} testId="csv-sep" /></div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((it) => (
@@ -246,10 +252,10 @@ export function ExportTab({ project, dirty, onSave, revisionId }: { project: Pro
         ))}
       </div>
       {msg && <p role="status" className="text-[12.5px]" data-testid="export-msg">{msg}</p>}
-      <p className="text-[11.5px] text-muted">DXF y DWG no están implementados (no se prometen). Programas CNC: fuera de alcance hasta contar con posprocesador homologado.</p>
+      <Hint>DXF y DWG no están implementados (no se prometen). Programas CNC: fuera de alcance hasta contar con posprocesador homologado.</Hint>
       {!IS_FIREBASE && <section className="rounded-xl border border-line p-3">
         <h3 className="font-semibold">Render fotorrealista (opcional)</h3>
-        <p className="text-[12px] text-muted">Interfaz preparada para un servicio externo configurado en servidor. Distingue «inspiración visual» de «render geométricamente fiel». Un render nunca sustituye planos ni despiece.</p>
+        <Hint>Requiere un servicio externo configurado en el servidor. Un render nunca sustituye planos ni despiece.</Hint>
         <Button className="mt-2" variant="secondary" onClick={async () => { const r = await api<{ status: string; disclaimer: string }>('/api/render', { method: 'POST', json: { projectId: project.id, moduleId: project.modules[0]?.id, kind: 'inspiracion_visual' } }); setRender(`${r.status}: ${r.disclaimer}`); }}>Solicitar render de inspiración</Button>
         {render && <p className="mt-1 text-[12px]">{render}</p>}
       </section>}
@@ -268,7 +274,7 @@ export function HistoryTab({ revisions, onCreate, onOpen, onRefresh, saved }: {
         <Button disabled={!saved} title={saved ? '' : 'Guarde los cambios primero'} onClick={async () => { await onCreate(note); setNote(''); }} data-testid="create-revision">Congelar revisión</Button>
         <Button variant="secondary" onClick={onRefresh}>Actualizar</Button>
       </div>
-      {!saved && <Alert tone="warn">Guarde antes de congelar una revisión: la revisión se toma del proyecto guardado.</Alert>}
+      {!saved && <Alert tone="warn">Guarda primero para congelar una revisión.</Alert>}
       {revisions === null ? <p className="text-muted">Cargando…</p> : revisions.length === 0 ? <EmptyState title="Sin revisiones">Las revisiones congelan geometría, versión de cálculo y estados.</EmptyState> : (
         <table>
           <thead><tr><th>#</th><th>Fecha</th><th>Nota</th><th>Autor</th><th>Cálculo</th><th>Liberación</th><th>Cotización</th><th></th></tr></thead>
@@ -285,7 +291,6 @@ export function HistoryTab({ revisions, onCreate, onOpen, onRefresh, saved }: {
   );
 }
 
-const CATEGORY_LABEL: Record<string, string> = { cierre: 'Cierre de medidas', apoyo: 'Apoyos', canto: 'Cantos', espesor: 'Espesores', herraje: 'Herrajes', flecha: 'Flecha', 'tamaño': 'Tamaños de taller', frentes: 'Frentes', peso: 'Peso' };
 const STATUS_TONE = { ok: 'ok', info: 'info', warning: 'warn', error: 'err' } as const;
 const STATUS_LABEL = { ok: 'Cumple', info: 'Info', warning: 'Revisar', error: 'No cumple' } as const;
 
@@ -294,37 +299,47 @@ function DimensionChecks({ plan, project, moduleFilter, onProject }: { plan: Man
   const set = (patch: Partial<typeof mf>) => onProject({ ...project, manufacturing: { ...mf, ...patch } });
   const checks = plan.calc.modules.filter((m) => !moduleFilter || m.moduleId === moduleFilter).flatMap((m) => m.checks);
   const order = { error: 0, warning: 1, info: 2, ok: 3 } as const;
-  const counts = { error: 0, warning: 0, info: 0, ok: 0 };
-  for (const c of checks) counts[c.status]++;
+  const count = (s: keyof typeof order) => checks.filter((c) => c.status === s).length;
+  const problems = checks.filter((c) => c.status === 'error' || c.status === 'warning').sort((a, b) => order[a.status] - order[b.status]);
+  const row = (c: (typeof checks)[number]) => (
+    <tr key={c.id}>
+      <td><Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge></td>
+      <td className="whitespace-normal"><strong>{c.moduleId}</strong> · {c.label}</td>
+      <td className="whitespace-normal text-muted">{c.expected}</td><td className="whitespace-normal font-semibold">{c.actual}</td>
+    </tr>
+  );
   return (
     <section className="grid gap-3" data-testid="dimension-checks">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-semibold">Verificación dimensional</h3>
-        {(['error', 'warning', 'info', 'ok'] as const).map((s) => <Badge key={s} tone={STATUS_TONE[s]}>{counts[s]} {STATUS_LABEL[s]}</Badge>)}
+        <h3 className="text-[15px] font-bold">Medidas</h3>
+        <Hint>Cada vez que cambias algo, el mueble se arma pieza por pieza y se compara contra lo pedido: medidas exteriores, apoyos, cantos, espesores, herrajes, flecha de entrepaños y límites del taller.</Hint>
       </div>
-      <p className="text-[12px] text-muted">Se recalcula con cada cambio: el mueble se reconstruye con las posiciones de cada pieza y se compara contra las medidas pedidas, los espesores, cantos, herrajes, flecha y límites del taller.</p>
-      <div className="grid max-w-4xl grid-cols-2 gap-2 md:grid-cols-4">
-        <label className="flex items-center gap-2 text-[12.5px] md:col-span-2"><input type="checkbox" checked={mf.edgeCompensation} onChange={(e) => set({ edgeCompensation: e.target.checked })} data-testid="edge-compensation" />Restar el espesor del canto en la medida de corte</label>
-        <NumberInput label="Repasado de canteadora por arista" suffix="mm" value={mf.premillMm} min={0} max={5} step={0.1} onChange={(v) => set({ premillMm: v })} hint="0 si la canteadora no pre-fresa" />
-        <NumberInput label="Flecha admisible: claro /" value={mf.sagLimitRatio} min={50} max={1000} onChange={(v) => set({ sagLimitRatio: v })} hint="200 = 0.5 % del claro" />
-        <NumberInput label="Ancho mínimo de corte" suffix="mm" value={mf.minPartWidthMm} min={0} max={200} onChange={(v) => set({ minPartWidthMm: v })} />
-        <NumberInput label="Mínimo para canteadora" suffix="mm" value={mf.minEdgebandWidthMm} min={0} max={300} onChange={(v) => set({ minEdgebandWidthMm: v })} />
-        <NumberInput label="Arista mínima canteable" suffix="mm" value={mf.minEdgebandLengthMm} min={0} max={600} onChange={(v) => set({ minEdgebandLengthMm: v })} />
-        <NumberInput label="Tolerancia de contacto" suffix="mm" value={mf.contactToleranceMm} min={0.1} max={5} step={0.1} onChange={(v) => set({ contactToleranceMm: v })} />
+      <div className="flex flex-wrap gap-2">
+        <BigStat icon={<CircleCheck className="h-5 w-5" />} value={count('ok')} label="Cumplen" tone="ok" />
+        <BigStat icon={<TriangleAlert className="h-5 w-5" />} value={count('warning')} label="Revisar" tone={count('warning') ? 'warn' : 'neutral'} />
+        <BigStat icon={<CircleX className="h-5 w-5" />} value={count('error')} label="No cumplen" tone={count('error') ? 'err' : 'neutral'} />
+        <span hidden data-testid="checks-errors">{count('error')}</span>
       </div>
-      <div className="max-h-[480px] overflow-auto">
-        <table>
-          <thead><tr><th>Módulo</th><th>Tipo</th><th>Verificación</th><th>Esperado</th><th>Calculado</th><th>Resultado</th></tr></thead>
-          <tbody>{[...checks].sort((a, b) => order[a.status] - order[b.status]).map((c) => (
-            <tr key={c.id}>
-              <td>{c.moduleId}</td><td>{CATEGORY_LABEL[c.category] ?? c.category}</td><td className="whitespace-normal">{c.label}</td>
-              <td className="whitespace-normal text-muted">{c.expected}</td><td className="whitespace-normal">{c.actual}</td>
-              <td><Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge></td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-      <p className="text-[11.5px] text-muted">Densidad, módulo de elasticidad y fluencia de los tableros son valores típicos; para un cálculo definitivo use los de la ficha técnica del tablero comprado. La flecha supone entrepaño simplemente apoyado con carga repartida.</p>
+      {problems.length > 0 && <table><tbody>{problems.map(row)}</tbody></table>}
+      <More summary={<>Ver las {checks.length} comprobaciones</>} testId="all-checks">
+        <div className="max-h-[420px] overflow-auto">
+          <table>
+            <thead><tr><th>Resultado</th><th>Comprobación</th><th>Esperado</th><th>Calculado</th></tr></thead>
+            <tbody>{[...checks].sort((a, b) => order[a.status] - order[b.status]).map(row)}</tbody>
+          </table>
+        </div>
+      </More>
+      <More summary="Ajustes del taller">
+        <div className="grid max-w-4xl grid-cols-2 gap-2 md:grid-cols-4">
+          <label className="flex items-center gap-2 text-[12.5px] md:col-span-2"><input type="checkbox" checked={mf.edgeCompensation} onChange={(e) => set({ edgeCompensation: e.target.checked })} data-testid="edge-compensation" />Restar el canto en la medida de corte</label>
+          <NumberInput label="Repasado por arista" suffix="mm" value={mf.premillMm} min={0} max={5} step={0.1} onChange={(v) => set({ premillMm: v })} />
+          <NumberInput label="Flecha máx.: claro /" value={mf.sagLimitRatio} min={50} max={1000} onChange={(v) => set({ sagLimitRatio: v })} />
+          <NumberInput label="Corte mínimo" suffix="mm" value={mf.minPartWidthMm} min={0} max={200} onChange={(v) => set({ minPartWidthMm: v })} />
+          <NumberInput label="Mínimo canteadora" suffix="mm" value={mf.minEdgebandWidthMm} min={0} max={300} onChange={(v) => set({ minEdgebandWidthMm: v })} />
+          <NumberInput label="Arista mínima" suffix="mm" value={mf.minEdgebandLengthMm} min={0} max={600} onChange={(v) => set({ minEdgebandLengthMm: v })} />
+          <NumberInput label="Tolerancia contacto" suffix="mm" value={mf.contactToleranceMm} min={0.1} max={5} step={0.1} onChange={(v) => set({ contactToleranceMm: v })} />
+        </div>
+      </More>
     </section>
   );
 }
