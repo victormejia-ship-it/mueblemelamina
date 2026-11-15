@@ -1,16 +1,19 @@
 'use client';
 import { useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { DEFAULT_CATALOG, type ModelFocus, type ProjectCalculation, type Project } from '@ms/domain';
 import { buildScene, sceneToSvg, type ViewKind } from '@ms/geometry';
-import { Download, EyeOff, Hash, Layers } from 'lucide-react';
+import { Download, EyeOff, Hash, Layers, Sparkles } from 'lucide-react';
 import { Hint } from '../ui';
 
+const RenderView = dynamic(() => import('./RenderView'), { ssr: false, loading: () => <div className="flex min-h-[300px] items-center justify-center rounded-xl bg-[#e9e6e0] text-[13px] text-[#55636f]">Preparando render…</div> });
+
 export function Viewer({ project, calc, selected, onSelect, focus = null }: { project: Project; calc: ProjectCalculation; selected: string | null; onSelect: (id: string | null) => void; focus?: ModelFocus | null }) {
-  const [view, setView] = useState<ViewKind>('iso');
+  const [view, setView] = useState<ViewKind | 'render'>('iso');
   const [exploded, setExploded] = useState(false);
   const [showIds, setShowIds] = useState(false);
   const [hideFronts, setHideFronts] = useState(false);
-  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view, exploded, showIds, hideFronts, selectedPartId: selected, noTitle: true, focus }), [project, calc, view, exploded, showIds, hideFronts, selected, focus]);
+  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view: view === 'render' ? 'iso' : view, exploded, showIds, hideFronts, selectedPartId: selected, noTitle: true, focus }), [project, calc, view, exploded, showIds, hideFronts, selected, focus]);
   const views: { v: ViewKind; label: string }[] = [{ v: 'iso', label: 'Isométrico' }, { v: 'front', label: 'Frente' }, { v: 'side', label: 'Lateral' }, { v: 'top', label: 'Planta' }];
 
   function downloadSvg() {
@@ -25,12 +28,15 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
   return (
     <div className="grid gap-2">
       <div className="flex flex-wrap items-center gap-2 no-print">
-        <div role="radiogroup" aria-label="Vista" className="flex gap-1">
+        <div role="radiogroup" aria-label="Vista" className="flex flex-wrap gap-1">
           {views.map((x) => (
             <button key={x.v} type="button" role="radio" aria-checked={view === x.v} onClick={() => setView(x.v)}
               className={`rounded-lg px-2.5 py-1 text-[12.5px] font-semibold ${view === x.v ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}>{x.label}</button>
           ))}
+          {!focus && <button type="button" role="radio" aria-checked={view === 'render'} onClick={() => setView('render')} data-testid="view-render"
+            className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[12.5px] font-semibold ${view === 'render' ? 'bg-accent text-accent-ink' : 'bg-gradient-to-r from-[#3b5a6e] to-[#5a4a6e]'}`}><Sparkles aria-hidden className="h-3.5 w-3.5" />Render</button>}
         </div>
+        {view !== 'render' && <>
         <button type="button" aria-pressed={exploded} onClick={() => setExploded(!exploded)} title="Separar piezas" aria-label="Separar piezas" data-testid="toggle-exploded"
           className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${exploded ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><Layers aria-hidden className="h-4 w-4" /><span className="hidden sm:inline">Separar piezas</span></button>
         <button type="button" aria-pressed={showIds} onClick={() => setShowIds(!showIds)} title="IDs" aria-label="IDs"
@@ -38,7 +44,9 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
         <button type="button" aria-pressed={hideFronts} onClick={() => setHideFronts(!hideFronts)} title="Sin frentes" aria-label="Sin frentes"
           className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${hideFronts ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><EyeOff aria-hidden className="h-4 w-4" /><span className="hidden sm:inline">Sin frentes</span></button>
         <button type="button" onClick={downloadSvg} title="Descargar SVG de esta vista" aria-label="Descargar SVG de esta vista" className="flex h-8 items-center rounded-lg bg-[#253541] px-2"><Download aria-hidden className="h-4 w-4" /></button>
+        </>}
       </div>
+      {view === 'render' ? <RenderView project={project} calc={calc} /> : <>
       <div className="overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_50%_40%,#304555,#14202a_75%)]">
         <svg viewBox={`0 0 ${scene.width} ${scene.height}`} className="h-auto w-full max-h-[620px]" role="img" aria-label={scene.ariaLabel} data-testid="model-svg" fontFamily="Inter, system-ui, sans-serif">
           <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#ffbe66" strokeWidth="1.2" /></marker></defs>
@@ -59,7 +67,8 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
           ))}
         </svg>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {selected}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un render ni un plano CNC.</Hint></div>
+      </>}
+      {view !== 'render' && <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {selected}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un plano CNC. Para ver cómo se vería, usa «Render».</Hint></div>}
     </div>
   );
 }
