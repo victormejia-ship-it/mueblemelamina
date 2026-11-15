@@ -17,6 +17,8 @@ export interface SceneOptions {
   width?: number;
   height?: number;
   title?: string;
+  /** Miniatura: sin cotas, títulos ni etiquetas y con márgenes mínimos. */
+  minimal?: boolean;
 }
 
 export type Pt = [number, number];
@@ -203,7 +205,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   type RawLine = { a: [number, number, number]; b: [number, number, number]; text: string };
   const dims: RawLine[] = [];
   const W = Math.round((ext.x1 - ext.x0) * 10) / 10, D = Math.round((ext.y1 - ext.y0) * 10) / 10, H = Math.round((ext.z1 - ext.z0) * 10) / 10;
-  if (view === 'iso' || view === 'front' || view === 'top') dims.push({ a: [ext.x0, ext.y0 - off, ext.z0], b: [ext.x1, ext.y0 - off, ext.z0], text: `${W} mm · ANCHO` });
+  if (!opts.minimal && (view === 'iso' || view === 'front' || view === 'top')) dims.push({ a: [ext.x0, ext.y0 - off, ext.z0], b: [ext.x1, ext.y0 - off, ext.z0], text: `${W} mm · ANCHO` });
   if (view === 'iso' || view === 'front') dims.push({ a: [ext.x0 - off, ext.y0, ext.z0], b: [ext.x0 - off, ext.y0, ext.z1], text: `${H} mm · ALTO` });
   if (view === 'side') dims.push({ a: [ext.x1, ext.y0 - off, ext.z0], b: [ext.x1, ext.y0 - off, ext.z1], text: `${H} mm · ALTO` });
   if (view === 'iso') dims.push({ a: [ext.x1 + off, ext.y0, ext.z0], b: [ext.x1 + off, ext.y1, ext.z0], text: `${D} mm · FONDO` });
@@ -219,6 +221,8 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     }
   }
 
+  if (opts.minimal) dims.length = 0;
+
   // Proyección y ajuste al viewBox
   const ordered = paintOrder(view, solids);
   const rawPolys: { s: Solid; face: 'top' | 'front' | 'side'; pts: Pt[] }[] = [];
@@ -227,7 +231,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   const allPts = [...rawPolys.flatMap((p) => p.pts), ...rawDims.flatMap((d) => [d.pa, d.pb])];
   const minX = Math.min(...allPts.map((p) => p[0])), maxX = Math.max(...allPts.map((p) => p[0]));
   const minY = Math.min(...allPts.map((p) => p[1])), maxY = Math.max(...allPts.map((p) => p[1]));
-  const margin = 70, top = 80;
+  const margin = opts.minimal ? 6 : 70, top = opts.minimal ? 6 : 80;
   const sc = Math.min((width - 2 * margin) / Math.max(maxX - minX, 1), (height - top - margin) / Math.max(maxY - minY, 1));
   const ox = margin + ((width - 2 * margin) - (maxX - minX) * sc) / 2 - minX * sc;
   const oy = top + ((height - top - margin) - (maxY - minY) * sc) / 2 - minY * sc;
@@ -264,7 +268,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
       labels.push({ x: p[0], y: p[1], text: part ? `${part.code}${part.quantity > 1 ? `·${s.key.split('#')[1]}` : ''}` : 'PTR', kind: 'id', anchor: 'middle' });
     }
   }
-  labels.unshift(
+  if (!opts.minimal) labels.unshift(
     { x: 24, y: 34, text: opts.title ?? project.name, kind: 'title', anchor: 'start' },
     { x: 24, y: 56, text: `${({ iso: 'Isométrico', front: 'Vista frontal', side: 'Vista lateral derecha', top: 'Planta' } as const)[view]} esquemático · cotas en mm${opts.exploded ? ' · despiece separado' : ''}`, kind: 'subtitle', anchor: 'start' },
   );
@@ -274,7 +278,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /** SVG autónomo (exportación). El editor React usa la misma escena. */
-export function sceneToSvg(scene: Scene, theme: 'dark' | 'light' = 'dark'): string {
+export function sceneToSvg(scene: Scene, theme: 'dark' | 'light' | 'transparent' = 'dark'): string {
   const bg = theme === 'dark' ? '#14202a' : '#ffffff';
   const dim = theme === 'dark' ? '#ffbe66' : '#b25e00';
   const txt = theme === 'dark' ? '#e8edf4' : '#1b2630';
@@ -282,7 +286,7 @@ export function sceneToSvg(scene: Scene, theme: 'dark' | 'light' = 'dark'): stri
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${scene.width} ${scene.height}" width="${scene.width}" height="${scene.height}" role="img" aria-label="${esc(scene.ariaLabel)}" font-family="Inter, system-ui, sans-serif">`);
   parts.push(`<title>${esc(scene.ariaLabel)}</title>`);
   parts.push(`<defs><marker id="ms-arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="none" stroke="${dim}" stroke-width="1.2"/></marker></defs>`);
-  parts.push(`<rect width="100%" height="100%" fill="${bg}"/>`);
+  if (theme !== 'transparent') parts.push(`<rect width="100%" height="100%" fill="${bg}"/>`);
   for (const p of scene.polygons) parts.push(`<polygon data-part-id="${esc(p.partId)}" points="${p.points.map((x) => x.join(',')).join(' ')}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${p.selected ? 2.4 : 1}" stroke-linejoin="round"/>`);
   for (const l of scene.lines) parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${dim}" stroke-width="1.3" marker-start="url(#ms-arrow)" marker-end="url(#ms-arrow)"/>`);
   for (const t of scene.labels) {
@@ -325,3 +329,15 @@ export function cutSheetSvg(s: CutSheetInput, width = 820, fluid = false): strin
   return out.join('\n');
 }
 export * from './workshop';
+
+
+/**
+ * Miniatura isométrica de un proyecto (para tarjetas de catálogo): SVG sin fondo, cotas ni textos,
+ * con tamaño adaptable (width="100%").
+ */
+export function thumbnailSvg(project: Project, calc: ProjectCalculation, catalog: Catalog, width = 320, height = 240): string {
+  const scene = buildScene(project, calc, catalog, { view: 'iso', exploded: false, showIds: false, hideFronts: false, minimal: true, width, height });
+  return sceneToSvg(scene, 'transparent')
+    .replace(/ width="\d+" height="\d+"/, ' width="100%" height="100%" preserveAspectRatio="xMidYMid meet"')
+    .replace(/ stroke="#90a7b8" stroke-width="1"/g, ' stroke="#9fb6c3" stroke-width="0.8"');
+}

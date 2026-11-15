@@ -17,8 +17,7 @@ test('Firebase: cuenta, proyecto en Firestore, guardado, revisión, exportación
   await register(page, `a-${stamp}@ejemplo.mx`);
   await expect(page.getByText('Firebase · datos de tu cuenta')).toBeVisible();
 
-  await page.getByLabel('Nombre del proyecto').fill('Cocina Firebase');
-  await page.getByRole('button', { name: 'Crear y abrir editor' }).click();
+  await page.getByTestId('family-kitchen_base').click();
   await page.waitForURL(/\/editor\/?\?id=/);
   await expect(page.getByTestId('model-svg')).toBeVisible();
 
@@ -53,7 +52,8 @@ test('Firebase: cuenta, proyecto en Firestore, guardado, revisión, exportación
   // Otro usuario no ve ni puede abrir el proyecto
   const other = await (await browser.newContext()).newPage();
   await register(other, `b-${stamp}@ejemplo.mx`);
-  await expect(other.getByText('Cocina Firebase')).toHaveCount(0);
+  await expect(other.getByTestId('catalog-grid')).toBeVisible();
+  await expect(other.getByRole('region', { name: 'Continuar' })).toHaveCount(0);
   await other.goto(url);
   await expect(other.getByText('Proyecto no encontrado')).toBeVisible();
 

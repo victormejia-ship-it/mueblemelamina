@@ -36,7 +36,7 @@ export function UserMenu() {
   if (!IS_FIREBASE || !email) return null;
   return (
     <span className="flex items-center gap-2">
-      <span className="text-muted" data-testid="user-email">{email}</span>
+      <span className="hidden text-muted sm:inline" data-testid="user-email">{email}</span>
       <Button variant="ghost" onClick={() => signOut()}>Cerrar sesión</Button>
     </span>
   );
@@ -115,5 +115,5 @@ export function BackendBadge() {
     import('@/lib/data').then((m) => m.getDataClient()).then((c) => c.backendLabel()).then(setB).catch(() => setB(null));
   }, [email]);
   if (!b) return null;
-  return <span className={`rounded-full border px-2 py-0.5 font-semibold ${b.tone === 'ok' ? 'border-[#2f6b43] bg-ok-bg text-ok' : 'border-[#907448] bg-warn-bg text-warn'}`}>{b.label}</span>;
+  return <span title={b.label} className={`max-w-[130px] truncate rounded-full border px-2 py-0.5 font-semibold sm:max-w-none ${b.tone === 'ok' ? 'border-[#2f6b43] bg-ok-bg text-ok' : 'border-[#907448] bg-warn-bg text-warn'}`}>{b.label}</span>;
 }

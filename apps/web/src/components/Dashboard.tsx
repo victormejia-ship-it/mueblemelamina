@@ -2,95 +2,77 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { Copy, FolderOpen, Plus, Trash2, Upload } from 'lucide-react';
 import type { ProjectSummary } from '@ms/domain';
 import { errorMessage } from '@/lib/api';
 import { getDataClient } from '@/lib/data';
-import { Alert, Badge, Button, EmptyState, Field, Panel } from './ui';
+import { Alert, Badge } from './ui';
 
-interface FamilyOpt { id: string; name: string; category: string; status: string }
-
-export function Dashboard({ families }: { families: FamilyOpt[] }) {
+/** Mis proyectos: abrir, duplicar, borrar o importar. Crear se hace desde el catálogo. */
+export function Dashboard() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ name: '', familyId: 'kitchen_base', customer: '', site: '' });
 
   const load = useCallback(async () => {
-    try {
-      setProjects(await (await getDataClient()).listProjects());
-    } catch (e) { setError(errorMessage(e)); }
+    try { setProjects(await (await getDataClient()).listProjects()); } catch (e) { setError(errorMessage(e)); }
   }, []);
   useEffect(() => { void load(); }, [load]);
-
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true); setError(null);
-    try {
-      const project = await (await getDataClient()).createProject(form);
-      router.push(`/editor?id=${encodeURIComponent(project.id)}`);
-    } catch (err) { setError(errorMessage(err)); setBusy(false); }
-  }
 
   async function duplicate(id: string) {
     try { await (await getDataClient()).duplicateProject(id); await load(); } catch (e) { setError(errorMessage(e)); }
   }
   async function remove(id: string, name: string) {
-    if (!confirm(`¿Eliminar "${name}" y todas sus revisiones? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar "${name}" y sus revisiones?`)) return;
     try { await (await getDataClient()).deleteProject(id); await load(); } catch (e) { setError(errorMessage(e)); }
   }
   async function importFile(file: File) {
     setError(null);
     try {
-      const data = JSON.parse(await file.text());
-      const { project, notes } = await (await getDataClient()).importProject(data);
-      if (notes.length) alert(notes.join('\n'));
+      const { project } = await (await getDataClient()).importProject(JSON.parse(await file.text()));
       router.push(`/editor?id=${encodeURIComponent(project.id)}`);
     } catch (e) { setError(`No se pudo importar: ${errorMessage(e)}`); }
   }
 
-  const groups = [...new Set(families.map((f) => f.category))];
+  const iconBtn = 'flex h-9 w-9 items-center justify-center rounded-lg text-[#cfdae4] hover:bg-[#22313e]';
   return (
-    <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[340px_1fr]">
-      <Panel title="Nuevo proyecto">
-        <form onSubmit={create} className="grid gap-3" aria-label="Crear proyecto">
-          <Field label="Nombre del proyecto" htmlFor="np-name"><input id="np-name" required maxLength={160} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Cocina depto. 302" /></Field>
-          <Field label="Plantilla inicial" htmlFor="np-family">
-            <select id="np-family" value={form.familyId} onChange={(e) => setForm({ ...form, familyId: e.target.value })}>
-              {groups.map((g) => <optgroup key={g} label={g}>{families.filter((f) => f.category === g).map((f) => <option key={f.id} value={f.id}>{f.name}{f.status === 'verified_vertical' ? ' ✓' : ''}</option>)}</optgroup>)}
-            </select>
-          </Field>
-          <Field label="Cliente" htmlFor="np-customer"><input id="np-customer" maxLength={160} value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })} /></Field>
-          <Field label="Obra / ubicación" htmlFor="np-site"><input id="np-site" maxLength={240} value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} /></Field>
-          <Button type="submit" disabled={busy}>{busy ? 'Creando…' : 'Crear y abrir editor'}</Button>
-          <label className="cursor-pointer text-[12px] text-[#bce8f2] underline">
-            Importar proyecto JSON (incluye migración del esquema mínimo)
+    <div className="mx-auto grid max-w-5xl gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[22px] font-extrabold">Mis proyectos</h1>
+        <div className="flex gap-2">
+          <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[#496072] bg-[#2a3a49] px-3 py-2 text-[13px] font-semibold" title="Importar proyecto (JSON)">
+            <Upload aria-hidden className="h-4 w-4" />Importar
             <input type="file" accept="application/json,.json" className="sr-only" onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
           </label>
-        </form>
-      </Panel>
-      <Panel title="Proyectos" actions={<Link className="text-[12.5px] text-[#bce8f2] underline" href="/catalogo">Ver catálogo de familias</Link>}>
-        {error && <div className="mb-3"><Alert tone="err">{error}</Alert></div>}
-        {projects === null && !error && <p role="status" className="text-muted">Cargando proyectos…</p>}
-        {projects?.length === 0 && <EmptyState title="Aún no hay proyectos">Cree uno desde una plantilla para empezar.</EmptyState>}
-        {projects && projects.length > 0 && (
-          <ul className="grid gap-2">
-            {projects.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-panel-2 px-4 py-3">
-                <div className="min-w-0">
-                  <Link href={`/editor?id=${encodeURIComponent(p.id)}`} className="font-semibold text-[#cfeff7] hover:underline">{p.name}</Link>
-                  <div className="text-[12px] text-muted">{p.customer || 'Sin cliente'} · {p.moduleCount} módulo(s) · actualizado {new Date(p.updatedAt).toLocaleString('es-MX')}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge tone="info">{p.revisionCount} revisión(es)</Badge>
-                  <Button variant="secondary" onClick={() => duplicate(p.id)} aria-label={`Duplicar ${p.name}`}>Duplicar</Button>
-                  <Button variant="danger" onClick={() => remove(p.id, p.name)} aria-label={`Eliminar ${p.name}`}>Eliminar</Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+          <Link href="/" className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-[13px] font-bold text-accent-ink hover:brightness-110" data-testid="new-project"><Plus aria-hidden className="h-4 w-4" />Nuevo</Link>
+        </div>
+      </div>
+      {error && <Alert tone="err">{error}</Alert>}
+      {projects === null && !error && <p role="status" className="text-muted">Cargando…</p>}
+      {projects?.length === 0 && (
+        <Link href="/" className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-line py-14 text-center hover:border-accent">
+          <FolderOpen aria-hidden className="h-10 w-10 text-muted" />
+          <span className="font-semibold">Aún no hay proyectos</span>
+          <span className="text-[13px] text-[#bce8f2]">Elegir un mueble del catálogo →</span>
+        </Link>
+      )}
+      {projects && projects.length > 0 && (
+        <ul className="grid gap-2 sm:grid-cols-2" data-testid="project-list">
+          {projects.map((p) => (
+            <li key={p.id} className="flex items-center gap-2 rounded-xl border border-line bg-panel-2 pr-1.5 transition hover:border-accent">
+              <Link href={`/editor?id=${encodeURIComponent(p.id)}`} className="min-w-0 flex-1 px-3 py-3">
+                <span className="block truncate font-semibold">{p.name}</span>
+                <span className="flex flex-wrap items-center gap-1.5 text-[12px] text-muted">
+                  {p.customer && <span>{p.customer} ·</span>}{p.moduleCount} módulo(s) · {new Date(p.updatedAt).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                  {p.revisionCount > 0 && <Badge tone="info">{p.revisionCount} rev.</Badge>}
+                </span>
+              </Link>
+              <button type="button" className={iconBtn} onClick={() => duplicate(p.id)} aria-label={`Duplicar ${p.name}`} title="Duplicar"><Copy className="h-4 w-4" /></button>
+              <button type="button" className={`${iconBtn} hover:text-err`} onClick={() => remove(p.id, p.name)} aria-label={`Eliminar ${p.name}`} title="Eliminar"><Trash2 className="h-4 w-4" /></button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

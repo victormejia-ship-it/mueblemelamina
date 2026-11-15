@@ -110,7 +110,7 @@ export function Editor({ initial }: { initial: Project }) {
     <div className="grid gap-3">
       <div className="flex flex-wrap items-end justify-between gap-3 no-print">
         <div className="flex flex-wrap items-end gap-3">
-          <Link href="/" className="pb-1 text-[12.5px] text-[#bce8f2] underline">← Proyectos</Link>
+          <Link href="/proyectos" className="pb-1 text-[12.5px] text-[#bce8f2] underline">← Mis proyectos</Link>
           <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Proyecto<input data-testid="project-name" className="!w-72 text-[15px] font-bold" value={project.name} maxLength={160} onChange={(e) => update({ ...project, name: e.target.value })} disabled={readOnly} /></label>
           <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Cliente<input className="!w-48" value={project.customer} maxLength={160} onChange={(e) => update({ ...project, customer: e.target.value })} disabled={readOnly} /></label>
           <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Obra<input className="!w-48" value={project.site} maxLength={240} onChange={(e) => update({ ...project, site: e.target.value })} disabled={readOnly} /></label>
