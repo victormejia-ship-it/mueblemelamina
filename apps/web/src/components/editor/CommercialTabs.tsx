@@ -224,6 +224,8 @@ export function ExportTab({ project, dirty, onSave, revisionId }: { project: Pro
     { f: 'quote-csv', label: 'Cotización CSV', desc: 'Líneas con proveedor, SKU, fecha, estado de precio y totales.' },
     { f: 'hardware-csv', label: 'Herrajes y herrería CSV', desc: 'Requerimientos con regla aplicada y validación.' },
     { f: 'checks-csv', label: 'Verificación dimensional CSV', desc: 'Cada comprobación con valor esperado, calculado y resultado.' },
+    { f: 'route-svg', label: 'Ruta de taller (SVG)', desc: 'Diagrama de estaciones con equipo, cifras y avisos del proyecto.' },
+    { f: 'tools-csv', label: 'Herramientas y equipo CSV', desc: 'Equipo por estación con necesidad, ajustes, pasos, seguridad y control.' },
     { f: 'json', label: 'JSON versionado', desc: 'Proyecto + cálculo + acomodo + cotización (schemaVersion, calcVersion).' },
     { f: 'svg', label: 'SVG isométrico', desc: 'Vector con cotas en mm e IDs de pieza.' },
     { f: 'svg', label: 'SVG despiece separado', desc: 'Piezas separadas con etiquetas.', extra: { exploded: true } },

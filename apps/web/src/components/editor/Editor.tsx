@@ -12,6 +12,7 @@ import { ModuleForm, ModuleList } from './ModulePanel';
 import { Viewer } from './Viewer';
 import { AssemblyTab, CutTab, HardwareTab, MachiningTab, PartsTab } from './ProductionTabs';
 import { ExportTab, HistoryTab, OffersTab, QualityTab, QuoteTab } from './CommercialTabs';
+import { WorkshopTab } from './WorkshopTab';
 
 const TABS = [
   { id: 'model', label: 'Modelo y cotas' },
@@ -20,6 +21,7 @@ const TABS = [
   { id: 'hardware', label: 'Herrajes y herrería' },
   { id: 'machining', label: 'Mecanizado' },
   { id: 'assembly', label: 'Montaje' },
+  { id: 'workshop', label: 'Taller' },
   { id: 'offers', label: 'Proveedores' },
   { id: 'quote', label: 'Presupuesto' },
   { id: 'qc', label: 'Calidad' },
@@ -185,6 +187,7 @@ export function Editor({ initial }: { initial: Project }) {
                 {tab === 'hardware' && <HardwareTab plan={plan} />}
                 {tab === 'machining' && <MachiningTab plan={plan} />}
                 {tab === 'assembly' && <AssemblyTab plan={plan} project={project} />}
+                {tab === 'workshop' && <WorkshopTab plan={plan} project={project} />}
                 {tab === 'offers' && <OffersTab plan={plan} project={project} offers={offers} today={today} onPricing={updatePricing} />}
                 {tab === 'quote' && <QuoteTab plan={plan} project={project} onPricing={updatePricing} saved={!dirty && !readOnly} />}
                 {tab === 'qc' && <QualityTab plan={plan} project={project} onProject={update} />}

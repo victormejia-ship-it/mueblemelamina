@@ -324,3 +324,4 @@ export function cutSheetSvg(s: CutSheetInput, width = 820, fluid = false): strin
   out.push('</svg>');
   return out.join('\n');
 }
+export * from './workshop';

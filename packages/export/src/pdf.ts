@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import {
-  CALC_VERSION, QC_CHECKLIST, assemblySteps, catalogLookup, diagonalChecks, formatMXN,
+  CALC_VERSION, EQUIPMENT, QC_CHECKLIST, assemblySteps, catalogLookup, diagonalChecks, formatMXN, workshopRoute,
   type Catalog, type ManufacturingPlan, type Project,
 } from '@ms/domain';
 import { buildScene } from '@ms/geometry';
@@ -185,6 +185,18 @@ export async function buildPdf(project: Project, plan: ManufacturingPlan, catalo
     [150, 55, 85, 55, 60, 80]);
   w.text(`Costo directo neto: ${formatMXN(q.directCostNetCents)} · Venta antes de IVA (${q.mode === 'margin' ? `margen ${q.marginPct} % sobre venta` : `markup ${q.markupPct} %`}): ${formatMXN(q.sellBeforeTaxCents)} · IVA ${q.taxRatePct} %: ${formatMXN(q.taxCents)} · Total: ${formatMXN(q.totalCents)}`, 9, true);
   for (const wn of q.warnings) w.text(`• ${wn}`, 8);
+
+  w.h2('Ruta de taller');
+  const route = workshopRoute(project, plan, catalog);
+  for (const st of route.stations) {
+    w.text(`${st.number}. ${st.name}${st.parallel ? ' (en paralelo)' : ''} — ${st.goal}`, 9, true);
+    w.text(`Equipo: ${st.equipmentIds.map((id) => EQUIPMENT.find((e) => e.id === id)?.name ?? id).join(', ')}`, 8);
+    if (st.metrics.length) w.text(st.metrics.map((m) => `${m.label}: ${m.value}`).join(' · '), 8);
+    for (const a of st.alerts) w.text(`! ${a}`, 8, false, rgb(0.63, 0.27, 0));
+  }
+  w.h2('Herramientas y equipo');
+  w.table(['Equipo', 'Necesidad', 'Para qué', 'Ajustes del proyecto', 'Seguridad'],
+    route.equipment.map((n) => [n.item.name, n.need, n.reason, n.projectSettings.join('; '), n.item.safety.slice(0, 3).join('; ')]), [95, 50, 110, 140, 110]);
 
   w.h2('Secuencia constructiva');
   for (const m of project.modules) {

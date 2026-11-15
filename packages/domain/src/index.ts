@@ -15,3 +15,5 @@ export * from './pricing/import';
 export * from './plan';
 export * from './render';
 export * from './repository';
+export * from './workshop/equipment';
+export * from './workshop/route';
