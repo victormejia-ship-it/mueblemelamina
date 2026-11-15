@@ -55,3 +55,21 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           npx -y firebase-tools@15.35.0 deploy --only hosting,firestore --project modular-studio-mx --non-interactive
           rm -f "$RUNNER_TEMP/sa.json"
+
+      - name: Comprobar que el sitio publicado es esta versión
+        if: github.event_name != 'pull_request'
+        run: |
+          expected=$(sha256sum apps/web/out/index.html | cut -d' ' -f1)
+          for i in 1 2 3 4 5 6; do
+            curl -sS -D headers.txt -o served.html "https://modular-studio-mx.web.app/?v=${GITHUB_SHA}"
+            served=$(sha256sum served.html | cut -d' ' -f1)
+            if [ "$served" = "$expected" ]; then
+              echo "OK: la portada publicada coincide con la compilación ${GITHUB_SHA::7}"
+              grep -i '^cache-control' headers.txt || true
+              exit 0
+            fi
+            echo "Intento $i: aún no coincide; reintento en 10 s"; sleep 10
+          done
+          echo "::error::La portada publicada no coincide con la compilación."
+          grep -i '^cache-control' headers.txt || true
+          exit 1

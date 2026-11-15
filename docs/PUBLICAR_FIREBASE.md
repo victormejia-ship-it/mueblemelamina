@@ -49,6 +49,10 @@ npm run deploy:firebase
 
 En ambos casos se publica el sitio (`apps/web/out`), `firestore.rules` y `firestore.indexes.json`. La URL pública es `https://modular-studio-mx.web.app`.
 
+## Caché y versión publicada
+
+Las páginas (`/`, `/editor/`, `*.html`, `*.txt`) se sirven con `Cache-Control: no-cache`: el navegador consulta en cada visita si hay versión nueva (con ETag, sin volver a descargar si no cambió). Los archivos de `/_next/static/` llevan caché de un año porque su nombre cambia en cada versión. Después de publicar, GitHub Actions descarga la portada en línea y la compara con la recién compilada.
+
 ## Qué cambia en modo Firebase
 
 | Aspecto | Modo Firebase (Hosting) | Modo servidor (Next.js + API) |
