@@ -19,6 +19,8 @@ export interface SceneOptions {
   title?: string;
   /** Miniatura: sin cotas, títulos ni etiquetas y con márgenes mínimos. */
   minimal?: boolean;
+  /** Sin título ni subtítulo (cuando la interfaz ya los muestra). */
+  noTitle?: boolean;
 }
 
 export type Pt = [number, number];
@@ -231,7 +233,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   const allPts = [...rawPolys.flatMap((p) => p.pts), ...rawDims.flatMap((d) => [d.pa, d.pb])];
   const minX = Math.min(...allPts.map((p) => p[0])), maxX = Math.max(...allPts.map((p) => p[0]));
   const minY = Math.min(...allPts.map((p) => p[1])), maxY = Math.max(...allPts.map((p) => p[1]));
-  const margin = opts.minimal ? 6 : 70, top = opts.minimal ? 6 : 80;
+  const margin = opts.minimal ? 6 : 70, top = opts.minimal ? 6 : opts.noTitle ? 36 : 80;
   const sc = Math.min((width - 2 * margin) / Math.max(maxX - minX, 1), (height - top - margin) / Math.max(maxY - minY, 1));
   const ox = margin + ((width - 2 * margin) - (maxX - minX) * sc) / 2 - minX * sc;
   const oy = top + ((height - top - margin) - (maxY - minY) * sc) / 2 - minY * sc;
@@ -268,7 +270,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
       labels.push({ x: p[0], y: p[1], text: part ? `${part.code}${part.quantity > 1 ? `·${s.key.split('#')[1]}` : ''}` : 'PTR', kind: 'id', anchor: 'middle' });
     }
   }
-  if (!opts.minimal) labels.unshift(
+  if (!opts.minimal && !opts.noTitle) labels.unshift(
     { x: 24, y: 34, text: opts.title ?? project.name, kind: 'title', anchor: 'start' },
     { x: 24, y: 56, text: `${({ iso: 'Isométrico', front: 'Vista frontal', side: 'Vista lateral derecha', top: 'Planta' } as const)[view]} esquemático · cotas en mm${opts.exploded ? ' · despiece separado' : ''}`, kind: 'subtitle', anchor: 'start' },
   );

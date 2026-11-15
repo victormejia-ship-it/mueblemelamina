@@ -76,8 +76,7 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await expect(page.getByTestId('quote-status')).toHaveText('INCOMPLETO');
 
   // Guardar y congelar revisión
-  await page.getByTestId('save').click();
-  await expect(page.getByTestId('save-state')).toHaveText('Guardado');
+  await expect(page.getByTestId('save-state')).toHaveText('Guardado', { timeout: 10_000 });
   await page.getByTestId('tab-history').click();
   await page.getByTestId('revision-note').fill('Primera revisión E2E');
   await page.getByTestId('create-revision').click();
@@ -151,4 +150,27 @@ test('portada: catálogo con búsqueda, categorías y proyectos recientes', asyn
   await expect(page.getByRole('region', { name: 'Continuar' })).toContainText('Escritorio');
   await page.goto('/proyectos');
   await expect(page.getByTestId('project-list')).toContainText('Escritorio');
+});
+
+test('editor: medidas rápidas junto al dibujo y guardado automático', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('family-bookcase').click();
+  await page.waitForURL(/\/editor\/?\?id=/);
+  await page.getByTestId('quick-width').fill('1200');
+  await expect(page.getByTestId('model-svg')).toContainText('1200 mm · ANCHO');
+  await expect(page.getByTestId('mod-width')).toHaveValue('1200');
+  await expect(page.getByTestId('save-state')).toHaveText('Guardado', { timeout: 10_000 });
+  await page.reload();
+  await expect(page.getByTestId('quick-width')).toHaveValue('1200');
+  await page.getByTestId('checks-summary').click();
+  await expect(page.getByTestId('dimension-checks')).toBeVisible();
+
+  // Editar justo mientras se guarda: el último cambio no se pierde
+  await page.getByTestId('tab-model').click();
+  await page.getByTestId('quick-height').fill('1800');
+  await page.waitForTimeout(1250);
+  await page.getByTestId('quick-height').fill('1750');
+  await expect(page.getByTestId('save-state')).toHaveText('Guardado', { timeout: 10_000 });
+  await page.reload();
+  await expect(page.getByTestId('quick-height')).toHaveValue('1750');
 });

@@ -23,8 +23,7 @@ test('Firebase: cuenta, proyecto en Firestore, guardado, revisión, exportación
 
   await page.getByTestId('mod-width').fill('900');
   await expect(page.getByTestId('model-svg')).toContainText('900 mm · ANCHO');
-  await page.getByTestId('save').click();
-  await expect(page.getByTestId('save-state')).toHaveText('Guardado');
+  await expect(page.getByTestId('save-state')).toHaveText('Guardado', { timeout: 10_000 });
 
   await page.getByTestId('tab-history').click();
   await page.getByTestId('revision-note').fill('Rev Firebase');
