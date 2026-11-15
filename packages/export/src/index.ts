@@ -4,8 +4,8 @@
  * DXF/DWG: NO implementados (no se prometen).
  */
 import {
-  CALC_VERSION, FAMILIES, QC_CHECKLIST, assemblySteps, catalogLookup, formatMXN, mermaidDiagram,
-  type Catalog, type ManufacturingPlan, type Project,
+  CALC_VERSION, FAMILIES, QC_CHECKLIST, STATIONS, assemblySteps, catalogLookup, formatMXN, mermaidDiagram,
+  type Catalog, type ManufacturingPlan, type Project, type WorkshopRoute,
 } from '@ms/domain';
 import { buildScene, cutSheetSvg, sceneToSvg, type SceneOptions } from '@ms/geometry';
 
@@ -65,6 +65,16 @@ export function hardwareCsv(plan: ManufacturingPlan, sep: CsvSeparator = ','): s
   const rows = plan.calc.hardware.map((h) => [h.id, h.moduleId, h.category, h.description, h.productKey, num(h.quantity, sep), h.unit, h.basis, h.validationStatus]);
   const steel = plan.calc.steel.flatMap((s) => s.pieces.map((p) => [p.id, s.moduleId, `herrería ${s.shape}`, `${p.label} ${s.sectionSpec}`, s.profileId, p.count, `pza de ${p.lengthMm} mm`, 'geometría', s.loadValidationRequired ? 'requiere validación de cargas' : '']));
   return toCsv([head, ...rows, ...steel], sep);
+}
+
+/** Lista de herramientas y equipo del proyecto con su estación, necesidad, ajustes, seguridad y control. */
+export function toolsCsv(route: WorkshopRoute, sep: CsvSeparator = ','): string {
+  const head = ['Estación', 'Equipo', 'Necesidad', 'Para qué en este proyecto', 'Ajustes del proyecto', 'Pasos', 'Seguridad (EPP)', 'Control al terminar', 'Alternativas', 'Consumibles'];
+  const rows = route.equipment.map((n) => [
+    STATIONS.find((s) => s.id === n.item.station)?.name ?? n.item.station, n.item.name, n.need, n.reason, n.projectSettings.join(' | '),
+    n.item.steps.map((s, i) => `${i + 1}. ${s}`).join(' | '), n.item.safety.join(' | '), n.item.qualityChecks.join(' | '), n.item.alternatives.join(' | '), n.item.consumables.join(' | '),
+  ]);
+  return toCsv([head, ...rows], sep);
 }
 
 /** Verificación dimensional (esperado vs. calculado) por módulo. */

@@ -23,6 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link className="rounded-lg px-3 py-1.5 hover:bg-[#22313e]" href="/">Proyectos</Link>
               <Link className="rounded-lg px-3 py-1.5 hover:bg-[#22313e]" href="/catalogo">Catálogo</Link>
               <Link className="rounded-lg px-3 py-1.5 hover:bg-[#22313e]" href="/proveedores">Proveedores y precios</Link>
+              <Link className="rounded-lg px-3 py-1.5 hover:bg-[#22313e]" href="/taller">Taller</Link>
             </nav>
           </div>
           <div className="flex items-center gap-2 text-[11.5px]">

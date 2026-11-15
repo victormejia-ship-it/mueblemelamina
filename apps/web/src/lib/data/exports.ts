@@ -1,5 +1,5 @@
 'use client';
-import { DEFAULT_CATALOG, planProject, type Project, type SupplierOffer } from '@ms/domain';
+import { DEFAULT_CATALOG, planProject, workshopRoute, type Project, type SupplierOffer } from '@ms/domain';
 import type { ExportFormat, ExportOptions } from './types';
 
 export function saveBlob(data: BlobPart, type: string, name: string): string {
@@ -26,6 +26,8 @@ export async function exportInBrowser(project: Project, offers: SupplierOffer[],
     case 'parts-csv': return saveBlob(ex.partsCsv(plan, DEFAULT_CATALOG, sep), 'text/csv;charset=utf-8', `${base}-despiece.csv`);
     case 'quote-csv': return saveBlob(ex.quoteCsv(plan, sep), 'text/csv;charset=utf-8', `${base}-cotizacion.csv`);
     case 'hardware-csv': return saveBlob(ex.hardwareCsv(plan, sep), 'text/csv;charset=utf-8', `${base}-herrajes.csv`);
+    case 'tools-csv': return saveBlob(ex.toolsCsv(workshopRoute(project, plan, DEFAULT_CATALOG), sep), 'text/csv;charset=utf-8', `${base}-herramientas.csv`);
+    case 'route-svg': { const g = await import('@ms/geometry'); return saveBlob(g.routeDiagramSvg(workshopRoute(project, plan, DEFAULT_CATALOG), project.name), 'image/svg+xml', `${base}-ruta-de-taller.svg`); }
     case 'checks-csv': return saveBlob(ex.checksCsv(plan, sep), 'text/csv;charset=utf-8', `${base}-verificacion.csv`);
     case 'svg': return saveBlob(ex.projectSvg(project, plan, DEFAULT_CATALOG, { view: opts.view ?? 'iso', exploded: !!opts.exploded, showIds: !!opts.exploded }), 'image/svg+xml', `${base}-${opts.view ?? 'iso'}.svg`);
     case 'cut-svg': {

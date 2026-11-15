@@ -33,6 +33,16 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await page.getByTestId('tab-model').click();
   await expect(page.getByTestId('checks-summary')).toHaveText('Todo cuadra');
 
+  // Ruta de taller con equipo y fichas
+  await page.getByTestId('tab-workshop').click();
+  await expect(page.getByTestId('route-flow')).toContainText('Corte de tableros');
+  await expect(page.getByTestId('route-flow')).toContainText('Canteado');
+  await expect(page.getByTestId('tool-table')).toContainText('Seccionadora');
+  await expect(page.getByTestId('equipment-seccionadora')).toContainText('Kerf 4 mm');
+  const [routeSvg] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-route').click()]);
+  expect(routeSvg.suggestedFilename()).toMatch(/ruta-de-taller\.svg$/);
+  await page.getByTestId('tab-model').click();
+
   // Error bloqueante si W <= 2T
   await page.getByTestId('tab-model').click();
   await page.getByTestId('mod-width').fill('30');
@@ -115,4 +125,10 @@ test('proveedores: captura manual y CSV', async ({ page }) => {
   await page.getByLabel('Contenido CSV').fill('supplierId;productKey;sku;description;packQuantity;purchaseUnit;price;taxIncluded;taxRatePct;priceStatus;verifiedAt;validUntil;sourceUrl;quoteReference;available;reliability;capturedBy;notes\ntym_forest;edge:pvc19x045;CANTO-E2E;Canto 19 mm rollo 50 m;50;rollo;"450,00";si;16;COTIZADO;2026-01-10;;;F-2;;media;E2E;\n');
   await page.getByRole('button', { name: 'Importar', exact: true }).click();
   await expect(page.getByText(/Importadas 1 oferta/)).toBeVisible();
+});
+
+test('página general del taller', async ({ page }) => {
+  await page.goto('/taller');
+  await expect(page.getByTestId('route-flow')).toContainText('Instalación en obra');
+  await expect(page.getByTestId('equipment-canteadora')).toContainText('Seguridad');
 });
