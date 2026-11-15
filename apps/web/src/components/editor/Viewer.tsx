@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { DEFAULT_CATALOG, type ProjectCalculation, type Project } from '@ms/domain';
 import { buildScene, sceneToSvg, type ViewKind } from '@ms/geometry';
-import { Button } from '../ui';
+import { Button, Hint } from '../ui';
 
 export function Viewer({ project, calc, selected, onSelect }: { project: Project; calc: ProjectCalculation; selected: string | null; onSelect: (id: string | null) => void }) {
   const [view, setView] = useState<ViewKind>('iso');
@@ -53,7 +53,7 @@ export function Viewer({ project, calc, selected, onSelect }: { project: Project
           ))}
         </svg>
       </div>
-      <p className="text-[11.5px] text-muted">Proyección esquemática derivada de las mismas posiciones del despiece (cada polígono es una pieza del BOM; clic para seleccionar). No es render fotorrealista, CAD 3D ni plano CNC.{selected ? ` Seleccionada: ${selected}.` : ''}</p>
+      <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {selected}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un render ni un plano CNC.</Hint></div>
     </div>
   );
 }

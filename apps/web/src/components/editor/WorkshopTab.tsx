@@ -4,28 +4,38 @@ import { DEFAULT_CATALOG, workshopRoute, type ManufacturingPlan, type Project } 
 import { routeDiagramSvg } from '@ms/geometry';
 import { toolsCsv } from '@ms/export';
 import { saveBlob } from '@/lib/data/exports';
-import { Alert, Button, Panel } from '../ui';
-import { EquipmentCard, RouteFlow, ToolTable } from '../workshop/WorkshopViews';
+import { Boxes, Download, TriangleAlert, Wrench } from 'lucide-react';
+import { STATION_ICON } from '../icons';
+import { BigStat, Button, Hint } from '../ui';
+import { EquipmentGrid, RouteFlow } from '../workshop/WorkshopViews';
 
-/** Ruta de taller del proyecto: estaciones en orden, lista de herramientas y ficha de cada equipo. */
+/** Taller del proyecto: ruta de fabricación y equipo, a la vista lo esencial y el detalle a un toque. */
 export function WorkshopTab({ plan, project }: { plan: ManufacturingPlan; project: Project }) {
   const route = useMemo(() => workshopRoute(project, plan, DEFAULT_CATALOG), [project, plan]);
   const essential = route.equipment.filter((e) => e.need === 'esencial').length;
+  const alerts = route.stations.reduce((s, x) => s + x.alerts.length, 0);
+  const kg = Math.round(plan.calc.modules.reduce((s, m) => s + m.weightKg, 0));
+  const Ruta = STATION_ICON.corte;
   return (
-    <div className="grid gap-4" data-testid="workshop-tab">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[13px]"><strong>{route.stations.length} estaciones</strong> en orden y <strong>{essential} equipos esenciales</strong> para fabricar este proyecto. Las cifras salen del cálculo actual.</p>
-        <div className="flex flex-wrap gap-2 no-print">
-          <Button variant="secondary" onClick={() => saveBlob(routeDiagramSvg(route, project.name), 'image/svg+xml', `${project.id}-ruta-de-taller.svg`)} data-testid="download-route">Descargar diagrama (SVG)</Button>
-          <Button variant="secondary" onClick={() => saveBlob(toolsCsv(route, ';'), 'text/csv;charset=utf-8', `${project.id}-herramientas.csv`)}>Lista de herramientas (CSV)</Button>
+    <div className="grid gap-5" data-testid="workshop-tab">
+      <div className="flex flex-wrap items-center gap-2">
+        <BigStat icon={<Ruta className="h-5 w-5" />} value={route.stations.length} label="pasos" tone="info" />
+        <BigStat icon={<Wrench className="h-5 w-5" />} value={essential} label="equipos esenciales" tone="ok" />
+        <BigStat icon={<TriangleAlert className="h-5 w-5" />} value={alerts} label="avisos" tone={alerts ? 'warn' : 'ok'} />
+        <BigStat icon={<Boxes className="h-5 w-5" />} value={`${kg} kg`} label="peso de tableros" />
+        <div className="ml-auto flex gap-2 no-print">
+          <Button variant="secondary" onClick={() => saveBlob(routeDiagramSvg(route, project.name), 'image/svg+xml', `${project.id}-ruta-de-taller.svg`)} data-testid="download-route" title="Diagrama para imprimir"><Download aria-hidden className="mr-1 inline h-4 w-4" />Diagrama</Button>
+          <Button variant="secondary" onClick={() => saveBlob(toolsCsv(route, ';'), 'text/csv;charset=utf-8', `${project.id}-herramientas.csv`)} title="Lista de herramientas"><Download aria-hidden className="mr-1 inline h-4 w-4" />Herramientas</Button>
         </div>
       </div>
-      <Alert tone="info">Recorra las estaciones de arriba abajo. Toque un equipo para ver su procedimiento paso a paso, los ajustes con los valores de este proyecto, la seguridad y qué revisar al terminar.</Alert>
-      <Panel title="1 · Ruta de fabricación"><RouteFlow stations={route.stations} /></Panel>
-      <Panel title="2 · Herramientas y equipo"><ToolTable needs={route.equipment} /></Panel>
-      <Panel title="3 · Ficha de cada equipo">
-        <div className="grid gap-3">{route.equipment.map((n) => <EquipmentCard key={n.item.id} item={n.item} need={n} />)}</div>
-      </Panel>
+      <section>
+        <div className="mb-2 flex items-center gap-2"><h2 className="text-[16px] font-bold">Ruta</h2><Hint label="Cómo leerla">Se sigue de arriba abajo. Toca un paso para ver qué equipo usa y todas sus cifras. Los avisos en amarillo son lo que no hay que pasar por alto.</Hint></div>
+        <RouteFlow stations={route.stations} />
+      </section>
+      <section>
+        <h2 className="mb-2 text-[16px] font-bold">Equipo</h2>
+        <EquipmentGrid needs={route.equipment} />
+      </section>
     </div>
   );
 }

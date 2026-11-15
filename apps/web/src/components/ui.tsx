@@ -80,3 +80,42 @@ export const releaseLabel: Record<string, string> = {
   LIBERADO_CON_APROBACION: 'Liberado con aprobación',
 };
 export const quoteTone = (s: string): Tone => (s === 'COMPLETO' ? 'ok' : s === 'SIMULACION' ? 'info' : 'warn');
+
+/** Explicación opcional detrás de un ícono ⓘ: no ocupa espacio hasta que se toca. */
+export function Hint({ children, label = '¿Qué es esto?' }: { children: ReactNode; label?: string }) {
+  return (
+    <details className="group inline-block text-[12px] text-muted">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-full px-1.5 py-0.5 text-[#9bc7d5] hover:bg-[#22313e] [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-bold">i</span>
+        <span>{label}</span>
+      </summary>
+      <div className="mt-1 max-w-2xl rounded-lg border border-line bg-panel-2 px-3 py-2 leading-relaxed">{children}</div>
+    </details>
+  );
+}
+
+/** Sección plegable para lo avanzado. */
+export function More({ summary, children, open = false, testId }: { summary: ReactNode; children: ReactNode; open?: boolean; testId?: string }) {
+  return (
+    <details className="group rounded-xl border border-line" open={open} data-testid={testId}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[13px] font-semibold [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2">{summary}</span>
+        <span aria-hidden className="text-muted transition-transform group-open:rotate-180">▾</span>
+      </summary>
+      <div className="border-t border-line px-3 py-3">{children}</div>
+    </details>
+  );
+}
+
+/** Indicador grande: número + etiqueta corta con color de estado. */
+export function BigStat({ value, label, tone = 'neutral', icon }: { value: ReactNode; label: string; tone?: Tone; icon?: ReactNode }) {
+  return (
+    <div className={`flex min-w-[120px] items-center gap-2.5 rounded-xl border px-3 py-2 ${TONES[tone]}`}>
+      {icon && <span aria-hidden className="shrink-0">{icon}</span>}
+      <div>
+        <div className="text-[20px] font-extrabold leading-none">{value}</div>
+        <div className="mt-0.5 text-[11.5px] font-semibold opacity-90">{label}</div>
+      </div>
+    </div>
+  );
+}

@@ -24,11 +24,13 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).toContainText('558.55');
   await page.getByTestId('tab-qc').click();
   await expect(page.getByTestId('dimension-checks')).toContainText('Ancho exterior');
-  await expect(page.getByTestId('dimension-checks')).toContainText('0 No cumple');
+  await expect(page.getByTestId('checks-errors')).toHaveText('0');
+  await page.getByText('Ajustes del taller').click();
   await page.getByTestId('edge-compensation').uncheck();
   await page.getByTestId('tab-parts').click();
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).not.toContainText('558.55');
   await page.getByTestId('tab-qc').click();
+  await page.getByText('Ajustes del taller').click();
   await page.getByTestId('edge-compensation').check();
   await page.getByTestId('tab-model').click();
   await expect(page.getByTestId('checks-summary')).toHaveText('Todo cuadra');
@@ -107,8 +109,8 @@ test('clóset y escritorio con herrería exigen validación', async ({ page }) =
   await page.getByTestId('add-module').selectOption('desk');
   await page.getByTestId('mod-desk-structure').selectOption('steel');
   await page.getByTestId('tab-qc').click();
-  await expect(page.getByTestId('issues-list')).toContainText('ANTITIP_REQUIRED');
-  await expect(page.getByTestId('issues-list')).toContainText('STEEL_LOAD_VALIDATION_REQUIRED');
+  await expect(page.getByTestId('issues-list')).toContainText('anclaje antivuelco');
+  await expect(page.getByTestId('issues-list')).toContainText('validar cargas');
   await expect(page.getByTestId('release-status')).toHaveText('Pendiente de validación');
   await page.getByTestId('tab-hardware').click();
   await expect(page.getByText(/barra\(s\) de 6.1 m/)).toBeVisible();

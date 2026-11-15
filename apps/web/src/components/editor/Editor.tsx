@@ -13,20 +13,21 @@ import { Viewer } from './Viewer';
 import { AssemblyTab, CutTab, HardwareTab, MachiningTab, PartsTab } from './ProductionTabs';
 import { ExportTab, HistoryTab, OffersTab, QualityTab, QuoteTab } from './CommercialTabs';
 import { WorkshopTab } from './WorkshopTab';
+import { Box, Calculator, Download, Drill, Factory, Hammer, History, List, Scissors, ShieldCheck, Store, Wrench } from 'lucide-react';
 
 const TABS = [
-  { id: 'model', label: 'Modelo y cotas' },
-  { id: 'parts', label: 'Despiece' },
-  { id: 'cut', label: 'Corte' },
-  { id: 'hardware', label: 'Herrajes y herrería' },
-  { id: 'machining', label: 'Mecanizado' },
-  { id: 'assembly', label: 'Montaje' },
-  { id: 'workshop', label: 'Taller' },
-  { id: 'offers', label: 'Proveedores' },
-  { id: 'quote', label: 'Presupuesto' },
-  { id: 'qc', label: 'Calidad' },
-  { id: 'export', label: 'Exportar' },
-  { id: 'history', label: 'Historial' },
+  { id: 'model', label: 'Modelo', icon: Box },
+  { id: 'parts', label: 'Despiece', icon: List },
+  { id: 'cut', label: 'Corte', icon: Scissors },
+  { id: 'hardware', label: 'Herrajes', icon: Wrench },
+  { id: 'machining', label: 'Perforación', icon: Drill },
+  { id: 'assembly', label: 'Montaje', icon: Hammer },
+  { id: 'workshop', label: 'Taller', icon: Factory },
+  { id: 'offers', label: 'Proveedores', icon: Store },
+  { id: 'quote', label: 'Presupuesto', icon: Calculator },
+  { id: 'qc', label: 'Calidad', icon: ShieldCheck },
+  { id: 'export', label: 'Exportar', icon: Download },
+  { id: 'history', label: 'Historial', icon: History },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
@@ -52,16 +53,11 @@ export function Editor({ initial }: { initial: Project }) {
   }, [initial.id]);
   useEffect(() => { loadRevisions(); }, [loadRevisions]);
 
-  const { plan, calcError, elapsed } = useMemo(() => {
-    const t0 = performance.now();
+  const { plan, calcError } = useMemo(() => {
     try {
-      const plan = planProject(project, DEFAULT_CATALOG, offers, today, 'vista-previa');
-      return { plan, calcError: null, elapsed: performance.now() - t0 };
-    } catch (e) { return { plan: null, calcError: errorMessage(e), elapsed: 0 }; }
+      return { plan: planProject(project, DEFAULT_CATALOG, offers, today, 'vista-previa'), calcError: null };
+    } catch (e) { return { plan: null, calcError: errorMessage(e) }; }
   }, [project, offers, today]);
-  // El tiempo medido sólo se muestra en cliente (evita discrepancias de hidratación).
-  const [ms, setMs] = useState<number | null>(null);
-  useEffect(() => { setMs(Math.round(elapsed)); }, [elapsed]);
 
   const update = useCallback((p: Project) => {
     if (readOnly) return;
@@ -155,14 +151,12 @@ export function Editor({ initial }: { initial: Project }) {
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Badge tone={releaseTone(calc.releaseStatus)}>{releaseLabel[calc.releaseStatus]}</Badge>
               <Badge tone={quoteTone(plan.quote.completeness)}>Cotización {plan.quote.completeness}</Badge>
-              <Badge tone="neutral">{calc.issues.filter((i) => i.severity === 'error').length} errores · {calc.issues.filter((i) => i.severity === 'blocker').length} por validar · {calc.issues.filter((i) => i.severity === 'warning').length} advertencias</Badge>
-              {ms !== null && <span className="text-[11px] text-muted" title="Tiempo de recálculo en el navegador">recalculado en {ms} ms</span>}
             </div>
           )}
           <div role="tablist" aria-label="Secciones del proyecto" className="mb-3 flex flex-wrap gap-1.5 no-print">
             {TABS.map((t) => (
               <button key={t.id} id={`tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={`panel-${t.id}`} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`}
-                className={`rounded-lg px-3 py-1.5 text-[12.5px] font-semibold ${tab === t.id ? 'bg-accent text-accent-ink' : 'bg-[#253541] text-[#e5edf3] hover:bg-[#2d4150]'}`}>{t.label}</button>
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold ${tab === t.id ? 'bg-accent text-accent-ink' : 'bg-[#253541] text-[#e5edf3] hover:bg-[#2d4150]'}`}><t.icon aria-hidden className="h-4 w-4" />{t.label}</button>
             ))}
           </div>
           <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>

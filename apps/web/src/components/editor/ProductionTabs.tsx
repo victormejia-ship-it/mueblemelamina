@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { DEFAULT_CATALOG, assemblySteps, catalogLookup, mermaidDiagram, type ManufacturingPlan, type Project } from '@ms/domain';
 import { cutSheetSvg } from '@ms/geometry';
-import { Alert, Badge, Button, EmptyState, Stat } from '../ui';
+import { Alert, Badge, Button, EmptyState, Hint, Stat } from '../ui';
 import { NumberInput } from './inputs';
 
 const L = catalogLookup(DEFAULT_CATALOG);
@@ -39,7 +39,7 @@ export function PartsTab({ plan, selected, onSelect }: { plan: ManufacturingPlan
           </tbody>
         </table>
       </div>
-      <p className="text-[11.5px] text-muted">Medida final = medida armada con tapacanto. Medida de corte = la que se corta en la seccionadora: final − espesor de canto en cada arista canteada (+ repasado configurado en Calidad). L1/L2 = aristas del largo (reducen el ancho); A1/A2 = aristas del ancho (reducen el largo); ● con canto.</p>
+      <Hint>Medida final = medida armada con tapacanto. Medida de corte = la que se corta en la seccionadora: final − espesor de canto en cada arista canteada (+ repasado configurado en Calidad). L1/L2 = aristas del largo (reducen el ancho); A1/A2 = aristas del ancho (reducen el largo); ● con canto.</Hint>
     </div>
   );
 }
@@ -58,7 +58,7 @@ export function CutTab({ plan, project, onCut }: { plan: ManufacturingPlan; proj
             {n.sheetsRequired !== null ? <Badge tone="ok">layout_factible · {n.sheetsRequired} tablero(s)</Badge> : <Badge tone="warn">sin confirmar</Badge>}
             <Badge tone="neutral" title="Una estimación por área nunca confirma el número de tableros">Estimación por área: {n.areaEstimate.sheetsEstimated} (estimacion_area_no_validada)</Badge>
           </div>
-          <p className="text-[12px] text-muted">{n.note}</p>
+          <Hint label="Nota">{n.note}</Hint>
           {n.layout?.unplaced.length ? <Alert tone="err">Sin acomodo: {n.layout.unplaced.map((u) => `${u.partId}#${u.instance} (${u.reason})`).join('; ')}</Alert> : null}
           <div className="grid gap-3 xl:grid-cols-2">
             {n.layout?.sheets.map((s) => (
@@ -67,7 +67,7 @@ export function CutTab({ plan, project, onCut }: { plan: ManufacturingPlan; proj
           </div>
         </section>
       ))}
-      <p className="text-[11.5px] text-muted">Optimizador guillotina (Best Short Side Fit) con kerf, escuadrado y veta. No considera defectos, retazos en inventario ni secuencia de seccionadora: validar en el optimizador del taller.</p>
+      <Hint>Optimizador guillotina (Best Short Side Fit) con kerf, escuadrado y veta. No considera defectos, retazos en inventario ni secuencia de seccionadora: validar en el optimizador del taller.</Hint>
     </div>
   );
 }
@@ -76,7 +76,7 @@ export function HardwareTab({ plan }: { plan: ManufacturingPlan }) {
   const { calc, steel } = plan;
   return (
     <div className="grid gap-4">
-      <Alert tone="warn">Cantidades orientativas derivadas de la geometría. Bisagras, correderas, conectores y anclajes requieren SKU con ficha técnica para quedar verificados; nunca se perfora con cotas genéricas.</Alert>
+      <div className="flex flex-wrap items-center gap-2"><Alert tone="warn">Cantidades orientativas: confirmar con la ficha de cada herraje.</Alert><Hint>Bisagras, correderas, conectores y anclajes requieren SKU con ficha técnica para quedar verificados; nunca se perfora con cotas genéricas.</Hint></div>
       <div className="max-h-[420px] overflow-auto">
         <table data-testid="hardware-table">
           <thead><tr><th>Módulo</th><th>Tipo</th><th>Descripción</th><th className="num">Cant.</th><th>Unidad</th><th>Regla</th><th>Estado</th></tr></thead>
@@ -127,7 +127,7 @@ export function MachiningTab({ plan }: { plan: ManufacturingPlan }) {
           ))}</tbody>
         </table>
       </div>
-      <p className="text-[11.5px] text-muted">Para generar coordenadas, capture el patrón desde la ficha técnica del SKU (packages/domain/src/catalog/hardware.ts) con estado «verified». El motor valida salida de broca y traslape de barrenos. No se generan programas CNC.</p>
+      <Hint>Para generar coordenadas, capture el patrón desde la ficha técnica del SKU (packages/domain/src/catalog/hardware.ts) con estado «verified». El motor valida salida de broca y traslape de barrenos. No se generan programas CNC.</Hint>
     </div>
   );
 }

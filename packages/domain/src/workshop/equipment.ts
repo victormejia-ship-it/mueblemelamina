@@ -10,6 +10,9 @@ export type StationId =
 
 export type EquipmentCategory = 'medición' | 'corte' | 'canteado' | 'mecanizado' | 'armado' | 'herrajes' | 'herrería' | 'acabado' | 'instalación' | 'seguridad';
 
+/** Equipo de protección personal (se muestra como íconos). */
+export type PPE = 'gafas' | 'auditiva' | 'respirador' | 'guantes' | 'careta' | 'calzado';
+
 export interface EquipmentItem {
   id: string;
   name: string;
@@ -17,8 +20,10 @@ export interface EquipmentItem {
   station: StationId;
   /** Para qué sirve, en una línea. */
   purpose: string;
-  /** Pasos de la operación (diagrama). */
+  /** Pasos de la operación (diagrama): 2–4 palabras cada uno; el detalle va en keySettings. */
   steps: string[];
+  /** EPP obligatorio en este equipo. */
+  ppe: PPE[];
   /** Ajustes y puntos críticos de la operación. */
   keySettings: string[];
   /** Riesgos y equipo de protección personal. */
@@ -61,7 +66,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'flexometro', name: 'Flexómetro 5–8 m', category: 'medición', station: 'preparacion',
     purpose: 'Medir obra, tableros y piezas.',
-    steps: ['Revisar gancho y cinta (sin golpes ni holgura)', 'Medir siempre desde la misma referencia', 'Anotar en mm, no en fracciones', 'Repetir la medida crítica dos veces'],
+    steps: ['Revisar cinta', 'Medir desde un mismo punto', 'Anotar en mm', 'Repetir lo crítico'],
+    ppe: [],
     keySettings: ['Usar el mismo flexómetro en obra y taller (evita diferencias entre instrumentos)', 'Para medidas críticas usar regla metálica o calibrador'],
     safety: ['Sin riesgos relevantes'],
     qualityChecks: ['Medidas de obra registradas en el proyecto'],
@@ -71,7 +77,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'calibrador', name: 'Calibrador (vernier) digital', category: 'medición', station: 'preparacion',
     purpose: 'Medir el espesor REAL del tablero y del canto (el cálculo usa el espesor del proyecto).',
-    steps: ['Cerrar y poner en cero', 'Medir el tablero en 3 puntos', 'Comparar con el espesor del proyecto', 'Medir el espesor del canto'],
+    steps: ['Poner en cero', 'Medir en 3 puntos', 'Comparar con proyecto', 'Medir el canto'],
+    ppe: [],
     keySettings: ['Si el espesor real difiere más de 0.3 mm, actualizarlo en el módulo antes de cortar'],
     safety: ['Sin riesgos relevantes'],
     qualityChecks: ['Espesor real = espesor del proyecto (±0.3 mm)', 'Canto: ancho ≥ espesor + 1 mm'],
@@ -81,7 +88,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'escuadra', name: 'Escuadra de precisión', category: 'medición', station: 'corte',
     purpose: 'Comprobar la escuadra de piezas, del corte y de la caja armada.',
-    steps: ['Apoyar en la orilla de referencia', 'Verificar luz entre escuadra y pieza', 'Marcar la pieza si no cumple'],
+    steps: ['Apoyar en la orilla', 'Buscar luz', 'Marcar si falla'],
+    ppe: [],
     keySettings: ['Verificar la propia escuadra contra una de referencia periódicamente'],
     safety: ['Sin riesgos relevantes'],
     qualityChecks: ['Sin luz visible en 300 mm'],
@@ -91,7 +99,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'medidor-diagonales', name: 'Medidor de diagonales / regla telescópica', category: 'medición', station: 'armado',
     purpose: 'Medir las dos diagonales de la caja y corregir la escuadra antes de fijar el respaldo.',
-    steps: ['Medir diagonal 1 (esquina a esquina)', 'Medir diagonal 2', 'Calcular la diferencia', 'Corregir con prensa hasta que la diferencia esté en tolerancia', 'Fijar el respaldo sin soltar la escuadra'],
+    steps: ['Medir diagonal 1', 'Medir diagonal 2', 'Comparar', 'Corregir con prensa', 'Fijar respaldo'],
+    ppe: [],
     keySettings: ['Diagonal teórica = √(ancho² + alto²), calculada por el proyecto', 'Tolerancia de diferencia configurable en Calidad'],
     safety: ['Sin riesgos relevantes'],
     qualityChecks: ['Diferencia de diagonales ≤ tolerancia del proyecto'],
@@ -102,7 +111,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'seccionadora', name: 'Seccionadora o escuadradora con incisor', category: 'corte', station: 'corte',
     purpose: 'Cortar tableros a medida de corte sin despostillar la melamina.',
-    steps: ['Revisar disco para melamina e incisor alineados', 'Refilar (escuadrar) la orilla del tablero', 'Cortes longitudinales (tiras) según mapa de corte', 'Cortes transversales de cada tira', 'Etiquetar cada pieza con su ID', 'Medir la primera pieza de cada modelo'],
+    steps: ['Revisar disco e incisor', 'Refilar orilla', 'Cortar tiras', 'Cortar piezas', 'Etiquetar ID', 'Medir 1.ª pieza'],
+    ppe: ['gafas', 'auditiva', 'respirador', 'calzado'],
     keySettings: ['Disco para melamina (dientes trapecio-plano) + incisor del mismo ancho de corte', 'Kerf del proyecto (ancho de corte del disco)', 'Escuadrado de orilla del proyecto', 'Respetar el sentido de veta del mapa de corte', 'Cortar a MEDIDA DE CORTE (ya descuenta el canto)'],
     safety: ['Gafas y protección auditiva', 'Guarda y cuchillo divisor instalados', 'Empujador para piezas angostas; nunca acercar las manos al disco', 'Guantes solo para manipular tableros, nunca al alimentar la sierra', EPP_POLVO],
     qualityChecks: ['Medida ±0.5 mm (tolerancia objetivo)', 'Sin despostillado en ninguna cara', 'Escuadra de pieza correcta'],
@@ -113,7 +123,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'canteadora', name: 'Canteadora (automática o semiautomática)', category: 'canteado', station: 'canteado',
     purpose: 'Pegar, refilar y acabar el tapacanto en las aristas indicadas.',
-    steps: ['Verificar canto: ancho ≥ espesor + 1 mm', 'Limpiar la arista (sin polvo ni astillas)', 'Pre-fresado (si la máquina lo tiene)', 'Encolado y prensado del canto', 'Despunte y refilado de sobrantes', 'Redondeado / raspado', 'Limpieza de cola y pulido', 'Medir la pieza: debe dar la medida final'],
+    steps: ['Revisar canto', 'Limpiar arista', 'Pre-fresar', 'Encolar y prensar', 'Refilar', 'Raspar', 'Limpiar', 'Medir'],
+    ppe: ['gafas', 'guantes'],
     keySettings: ['Temperatura y tipo de cola según ficha del adhesivo', 'Si la máquina pre-fresa, capturar el repasado en Calidad (el corte se agranda)', 'Orden: primero aristas cortas (A1/A2), luego largas (L1/L2)'],
     safety: ['Superficies y cola caliente: guantes térmicos al recargar', 'Gafas', 'No retirar recortes con la máquina en movimiento'],
     qualityChecks: ['Adherencia en toda la arista', 'Sin cola visible ni juntas abiertas', 'Medida final = medida de diseño del proyecto'],
@@ -123,7 +134,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'refilador-manual', name: 'Refilador manual de cantos', category: 'canteado', station: 'canteado',
     purpose: 'Recortar sobrante de canto en piezas pequeñas o reparaciones.',
-    steps: ['Apoyar la cuchilla al ras del tablero', 'Recortar en un solo sentido', 'Despuntar extremos', 'Matar filo con lija fina'],
+    steps: ['Apoyar al ras', 'Recortar', 'Despuntar', 'Lijar filo'],
+    ppe: ['guantes'],
     keySettings: ['Cuchilla afilada para no levantar el canto'],
     safety: ['Guantes anticorte'],
     qualityChecks: ['Canto al ras, sin rebaba'],
@@ -134,7 +146,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'taladro-banco', name: 'Taladro de banco con tope de profundidad', category: 'mecanizado', station: 'mecanizado',
     purpose: 'Perforar cazoletas Ø35, excéntricos y taquetes con profundidad controlada.',
-    steps: ['Cargar el patrón de la ficha técnica del herraje', 'Fijar tope de profundidad y guía de referencia', 'Perforar una pieza de prueba', 'Verificar posición y profundidad con el herraje', 'Perforar la serie', 'Revisar que ningún barreno atraviese la cara'],
+    steps: ['Cargar patrón', 'Fijar tope', 'Pieza de prueba', 'Revisar', 'Perforar serie', 'Revisar caras'],
+    ppe: ['gafas', 'respirador'],
     keySettings: ['Broca Forstner Ø35 para cazoleta de bisagra', 'Profundidad según ficha (el motor valida que no atraviese el tablero)', 'Referenciar todas las piezas desde la misma orilla', 'NO perforar operaciones marcadas «pendiente de ficha»'],
     safety: ['Gafas', 'Sujetar la pieza con prensa o tope, nunca con la mano', 'Sin guantes ni ropa suelta cerca del husillo', EPP_POLVO],
     qualityChecks: ['Posición ±0.5 mm contra la plantilla', 'Profundidad sin salir por la cara opuesta', 'Herraje entra sin forzar'],
@@ -144,7 +157,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'plantilla-system32', name: 'Plantilla de líneas de perforación (sistema 32 mm)', category: 'mecanizado', station: 'mecanizado',
     purpose: 'Perforar en serie los barrenos para soportes de entrepaño y bases de herraje.',
-    steps: ['Referenciar la plantilla al canto frontal y a la base', 'Fijar con prensas', 'Perforar con broca y tope', 'Repetir en el costado opuesto con la misma referencia'],
+    steps: ['Referenciar', 'Fijar', 'Perforar', 'Repetir costado'],
+    ppe: ['gafas', 'respirador'],
     keySettings: ['Misma referencia (frontal e inferior) en ambos costados para que los entrepaños queden a nivel'],
     safety: ['Gafas', EPP_POLVO],
     qualityChecks: ['Entrepaño a nivel en sus cuatro soportes'],
@@ -155,7 +169,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'atornillador', name: 'Taladro atornillador inalámbrico con embrague', category: 'armado', station: 'armado',
     purpose: 'Apretar excéntricos, tornillos de ensamble, respaldo y herrajes sin barrer la rosca.',
-    steps: ['Elegir punta correcta (PZ/PH)', 'Ajustar embrague bajo para aglomerado', 'Atornillar perpendicular a la cara', 'Detenerse al asentar la cabeza'],
+    steps: ['Elegir punta', 'Embrague bajo', 'Atornillar recto', 'Parar al asentar'],
+    ppe: ['gafas'],
     keySettings: ['Embrague bajo: el aglomerado se barre con facilidad', 'Tornillo para aglomerado (rosca gruesa)'],
     safety: ['Gafas'],
     qualityChecks: ['Tornillos asentados, sin barrer ni sobresalir'],
@@ -165,7 +180,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'prensas', name: 'Prensas (sargentos) y escuadras de armado', category: 'armado', station: 'armado',
     purpose: 'Mantener la caja a escuadra mientras se une y se fija el respaldo.',
-    steps: ['Presentar piezas por ID sobre banco plano', 'Colocar taquetes / excéntricos', 'Unir costados con tapa y piso', 'Prensar y escuadrar', 'Medir diagonales', 'Fijar respaldo y retirar prensas'],
+    steps: ['Presentar por ID', 'Poner taquetes', 'Unir caja', 'Prensar', 'Medir diagonales', 'Fijar respaldo'],
+    ppe: ['guantes'],
     keySettings: ['Banco de armado plano y nivelado', 'Tacos de protección para no marcar la melamina'],
     safety: ['Cuidado con atrapamiento de dedos', 'Piezas grandes entre dos personas'],
     qualityChecks: ['Diagonales en tolerancia', 'Uniones al ras, sin escalón'],
@@ -176,7 +192,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'plantillas-herrajes', name: 'Plantillas de montaje de bisagras, correderas y jaladeras', category: 'herrajes', station: 'frentes',
     purpose: 'Colocar herrajes en posición repetible y regular holguras.',
-    steps: ['Montar bases de bisagra y correderas con plantilla', 'Colgar puertas y montar cajones', 'Regular bisagras en sus 3 ejes', 'Igualar holguras perimetrales y entre hojas', 'Marcar y perforar jaladeras con plantilla', 'Probar apertura y cierre'],
+    steps: ['Montar bases', 'Colgar frentes', 'Regular 3 ejes', 'Igualar holguras', 'Jaladeras', 'Probar'],
+    ppe: [],
     keySettings: ['Holgura perimetral y entre hojas del proyecto', 'Hojas que giran sobre divisor: bisagra de semi-solape', 'Correderas: holgura lateral según ficha (la caja de cajón ya la descuenta)'],
     safety: ['Cuidado con dedos al probar cierres suaves'],
     qualityChecks: ['Holguras uniformes', 'Apertura sin roces', 'Cierre completo y suave'],
@@ -187,7 +204,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'tronzadora', name: 'Tronzadora o sierra cinta para metal', category: 'herrería', station: 'herreria',
     purpose: 'Cortar PTR según el plan de barras a la medida y ángulo indicados.',
-    steps: ['Revisar plan de barras (cortes por barra)', 'Marcar y sujetar la barra en la prensa', 'Cortar respetando el kerf', 'Rebabar extremos', 'Identificar cada pieza'],
+    steps: ['Revisar plan', 'Sujetar barra', 'Cortar', 'Rebabar', 'Marcar pieza'],
+    ppe: ['gafas', 'auditiva', 'guantes'],
     keySettings: ['Disco o cinta para acero', 'Tope de longitud para piezas repetidas'],
     safety: ['Careta o gafas + protección auditiva', 'Guantes de carnaza para manipular', 'Pieza sujeta en prensa, nunca a mano'],
     qualityChecks: ['Longitud ±1 mm', 'Corte a escuadra'],
@@ -197,7 +215,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'soldadora', name: 'Soldadora (MIG o electrodo) con escuadras magnéticas', category: 'herrería', station: 'herreria',
     purpose: 'Unir el bastidor a escuadra y con cordones según diseño validado.',
-    steps: ['Limpiar zonas a soldar', 'Armar con escuadras magnéticas', 'Puntear esquinas', 'Verificar diagonales y plano', 'Soldar cordones alternando lados', 'Esmerilar y limpiar escoria'],
+    steps: ['Limpiar', 'Armar a escuadra', 'Puntear', 'Revisar diagonales', 'Soldar', 'Esmerilar'],
+    ppe: ['careta', 'guantes', 'calzado'],
     keySettings: ['Parámetros según espesor del PTR y ficha del equipo', 'Soldar alternando para reducir deformación', 'El diseño estructural lo valida un responsable (bloqueo de liberación)'],
     safety: ['Careta de soldar con filtro adecuado', 'Guantes y mandil de carnaza, ropa de algodón', 'Ventilación y extintor a mano', 'Retirar polvo de madera y combustibles del área'],
     qualityChecks: ['Diagonales del bastidor', 'Cordones continuos sin poros', 'Bastidor apoyado plano'],
@@ -207,7 +226,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'pintura-metal', name: 'Preparación y pintura anticorrosiva', category: 'acabado', station: 'herreria',
     purpose: 'Proteger el bastidor: desengrase, primario y acabado (o pintura electrostática externa).',
-    steps: ['Desengrasar', 'Lijar o sandblastear según acabado', 'Aplicar primario anticorrosivo', 'Aplicar acabado', 'Curar según ficha'],
+    steps: ['Desengrasar', 'Lijar', 'Primario', 'Acabado', 'Curar'],
+    ppe: ['respirador', 'guantes'],
     keySettings: ['Tiempos de secado y espesor según ficha de la pintura'],
     safety: ['Respirador para vapores orgánicos', 'Área ventilada, sin flama'],
     qualityChecks: ['Cobertura uniforme, sin escurrimientos', 'Sin óxido visible'],
@@ -218,7 +238,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'lampara-inspeccion', name: 'Lámpara de inspección (luz rasante)', category: 'medición', station: 'calidad',
     purpose: 'Revelar despostillado, rayones, cola visible y juntas de canto que no se ven con luz de techo.',
-    steps: ['Colocar la luz casi paralela a la superficie', 'Recorrer caras y cantos de cada frente', 'Marcar defectos con cinta', 'Corregir o reponer la pieza', 'Registrar el resultado en el checklist'],
+    steps: ['Luz rasante', 'Recorrer caras', 'Marcar defectos', 'Corregir', 'Registrar'],
+    ppe: [],
     keySettings: ['Revisar frentes y cantos visibles con prioridad', 'Inspeccionar antes de empacar'],
     safety: ['Sin riesgos relevantes'],
     qualityChecks: ['Sin despostillado, rayones ni cola visible en caras vistas'],
@@ -229,7 +250,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'empaque', name: 'Material de empaque y etiquetado por módulo', category: 'acabado', station: 'empaque',
     purpose: 'Evitar golpes en aristas y frentes durante el transporte.',
-    steps: ['Limpiar el módulo', 'Proteger esquinas con esquineros', 'Envolver frentes', 'Etiquetar con ID de módulo y peso', 'Planear la carga por peso'],
+    steps: ['Limpiar', 'Esquineros', 'Envolver frentes', 'Etiquetar', 'Planear carga'],
+    ppe: ['guantes', 'calzado'],
     keySettings: ['Módulos de más de 25 kg: maniobra entre dos personas'],
     safety: ['Levantar con la espalda recta; usar faja o diablo para cargas pesadas'],
     qualityChecks: ['Etiqueta visible con ID y peso', 'Frentes y cantos protegidos'],
@@ -239,7 +261,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'nivel', name: 'Nivel láser o de burbuja', category: 'instalación', station: 'instalacion',
     purpose: 'Instalar módulos a nivel y a plomo.',
-    steps: ['Trazar línea de nivel en muro', 'Nivelar patas o zoclo', 'Verificar plomo de costados', 'Alinear frentes entre módulos'],
+    steps: ['Trazar nivel', 'Nivelar base', 'Revisar plomo', 'Alinear frentes'],
+    ppe: [],
     keySettings: ['Tomar el punto más alto del piso como referencia'],
     safety: ['No mirar directo al láser'],
     qualityChecks: ['Módulos a nivel y a plomo', 'Frentes alineados entre módulos'],
@@ -249,7 +272,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'rotomartillo', name: 'Rotomartillo / taladro percutor y detector de instalaciones', category: 'instalación', station: 'instalacion',
     purpose: 'Perforar muro para colgadores y anclajes antivuelco sin dañar tuberías ni cables.',
-    steps: ['Detectar cables y tuberías', 'Identificar el tipo de muro', 'Elegir taquete y broca para ese muro', 'Perforar y limpiar el barreno', 'Instalar anclaje y apretar', 'Probar la sujeción'],
+    steps: ['Detectar instalaciones', 'Ver tipo de muro', 'Elegir taquete', 'Perforar', 'Anclar', 'Probar'],
+    ppe: ['gafas', 'auditiva', 'respirador'],
     keySettings: ['Taquete según muro (concreto, block, tablaroca)', 'Capacidad del anclaje validada para el peso del módulo + contenido'],
     safety: ['Gafas y protección auditiva', 'Respirador para polvo de concreto', 'Escalera estable'],
     qualityChecks: ['Anclajes firmes, sin juego', 'Módulo no se inclina al abrir cajones'],
@@ -260,7 +284,8 @@ export const EQUIPMENT: EquipmentItem[] = [
   {
     id: 'epp', name: 'Equipo de protección personal (EPP) y área de trabajo', category: 'seguridad', station: 'preparacion',
     purpose: 'Proteger a las personas en todas las estaciones.',
-    steps: ['Revisar EPP antes de iniciar', 'Verificar extracción de polvo y orden del área', 'Ubicar botiquín y extintor', 'Bloquear y desenergizar máquinas para mantenimiento'],
+    steps: ['Revisar EPP', 'Extracción y orden', 'Botiquín y extintor', 'Bloquear al reparar'],
+    ppe: ['gafas', 'auditiva', 'respirador', 'guantes', 'calzado'],
     keySettings: ['El polvo de madera y MDF es dañino: extracción en la fuente + respirador'],
     safety: ['Gafas de seguridad', 'Protección auditiva', 'Respirador N95/P2', 'Calzado de seguridad', 'Guantes según tarea', 'Botiquín y extintor'],
     qualityChecks: ['EPP completo antes de operar máquinas'],
