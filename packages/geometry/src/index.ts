@@ -3,7 +3,7 @@
  * Nunca altera el BOM: cada polígono proviene de una pieza con su ID.
  * Es un esquema axonométrico/ortogonal 2D, NO un modelo CAD 3D ni un plano CNC.
  */
-import { catalogLookup, type Box3, type Catalog, type PanelPart, type Project, type ProjectCalculation } from '@ms/domain';
+import { catalogLookup, type Box3, type Catalog, type ModelFocus, type PanelPart, type Project, type ProjectCalculation } from '@ms/domain';
 
 export type ViewKind = 'iso' | 'front' | 'side' | 'top';
 
@@ -21,6 +21,8 @@ export interface SceneOptions {
   minimal?: boolean;
   /** Sin título ni subtítulo (cuando la interfaz ya los muestra). */
   noTitle?: boolean;
+  /** Enfoque de una herramienta: resalta piezas, cantos y diagonales y atenúa el resto. */
+  focus?: Pick<ModelFocus, 'partIds' | 'edges' | 'diagonals' | 'labels'> | null;
 }
 
 export type Pt = [number, number];
@@ -34,9 +36,11 @@ export interface ScenePolygon {
   fill: string;
   stroke: string;
   selected: boolean;
+  /** Atenuado (fuera del enfoque de la herramienta). */
+  dim?: boolean;
 }
-export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' }
-export interface SceneLabel { x: number; y: number; text: string; kind: 'dim' | 'id' | 'title' | 'subtitle'; anchor: 'start' | 'middle' | 'end' }
+export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' | 'edge' | 'diag' }
+export interface SceneLabel { x: number; y: number; text: string; kind: 'dim' | 'id' | 'title' | 'subtitle' | 'focus'; anchor: 'start' | 'middle' | 'end' }
 
 export interface Scene {
   width: number;
@@ -225,6 +229,48 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
 
   if (opts.minimal) dims.length = 0;
 
+  // Enfoque de herramienta: cantos de piezas resaltadas y diagonales del frente de cada caja (coordenadas 3D)
+  const focus = opts.focus ?? null;
+  const focusSet = new Set(focus?.partIds ?? []);
+  const extra3: { a: [number, number, number]; b: [number, number, number]; kind: 'edge' | 'diag' }[] = [];
+  const extraLabels3: { p: [number, number, number]; text: string }[] = [];
+  if (focus) {
+    for (const sld of solids) {
+      const part = partsById.get(sld.partId);
+      if (!part || !focusSet.has(part.id)) continue;
+      if (focus.edges) {
+        const b = sld.b;
+        const ext3 = [b.x1 - b.x0, b.y1 - b.y0, b.z1 - b.z0];
+        const lo = [b.x0, b.y0, b.z0], hi = [b.x1, b.y1, b.z1];
+        const used = new Set<number>();
+        const axisOf = (v: number) => { const i = ext3.findIndex((e, k) => !used.has(k) && Math.abs(e - v) < 0.05); if (i >= 0) used.add(i); return i; };
+        const la = axisOf(part.lengthMm), wa = axisOf(part.widthMm);
+        const ta = [0, 1, 2].find((k) => !used.has(k));
+        if (la >= 0 && wa >= 0 && ta !== undefined) {
+          const mid = (lo[ta]! + hi[ta]!) / 2;
+          const pt = (l: number, w: number): [number, number, number] => { const v = [0, 0, 0]; v[la] = l; v[wa] = w; v[ta] = mid; return v as [number, number, number]; };
+          for (const e of Object.keys(part.edgeBand)) {
+            if (e === 'L1' || e === 'L2') { const w = e === 'L1' ? lo[wa]! : hi[wa]!; extra3.push({ a: pt(lo[la]!, w), b: pt(hi[la]!, w), kind: 'edge' }); }
+            else { const l = e === 'A1' ? lo[la]! : hi[la]!; extra3.push({ a: pt(l, lo[wa]!), b: pt(l, hi[wa]!), kind: 'edge' }); }
+          }
+        }
+      }
+      const label = focus.labels[part.id];
+      if (label && sld.key.endsWith('#1')) extraLabels3.push({ p: [(sld.b.x0 + sld.b.x1) / 2, view === 'front' ? sld.b.y0 : (sld.b.y0 + sld.b.y1) / 2, (sld.b.z0 + sld.b.z1) / 2], text: label });
+    }
+    if (focus.diagonals) {
+      for (const m of calc.modules) {
+        const boxes = solids.filter((x) => x.moduleId === m.moduleId && x.role === 'carcass').map((x) => x.b);
+        if (!boxes.length || !m.theoreticalDiagonalMm) continue;
+        const x0 = Math.min(...boxes.map((b) => b.x0)), x1 = Math.max(...boxes.map((b) => b.x1));
+        const z0 = Math.min(...boxes.map((b) => b.z0)), z1 = Math.max(...boxes.map((b) => b.z1));
+        const y = Math.min(...boxes.map((b) => b.y0));
+        extra3.push({ a: [x0, y, z0], b: [x1, y, z1], kind: 'diag' }, { a: [x1, y, z0], b: [x0, y, z1], kind: 'diag' });
+        extraLabels3.push({ p: [(x0 + x1) / 2, y, (z0 + z1) / 2], text: `diagonal ${Math.round(m.theoreticalDiagonalMm)} mm` });
+      }
+    }
+  }
+
   // Proyección y ajuste al viewBox
   const ordered = paintOrder(view, solids);
   const rawPolys: { s: Solid; face: 'top' | 'front' | 'side'; pts: Pt[] }[] = [];
@@ -244,9 +290,11 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     const finish = L.finish(part?.finishId ?? project.modules.find((m) => m.id === s.moduleId)?.finishId ?? 'grafito');
     const c = colorsFor(part ?? { role: s.role }, finish.colors);
     const selected = opts.selectedPartId === s.partId;
+    const inFocus = !focus || focusSet.has(s.partId);
     return {
       key: `${s.key}-${face}`, partId: s.partId, moduleId: s.moduleId, role: s.role, points: pts.map(T),
-      fill: selected ? shade(c[face], 0.35) : c[face], stroke: selected ? '#ffbe3d' : '#90a7b8', selected,
+      fill: selected ? shade(c[face], 0.35) : focus && inFocus ? shade(c[face], 0.12) : c[face],
+      stroke: selected ? '#ffbe3d' : focus && inFocus ? '#5fd4ef' : '#90a7b8', selected, dim: !inFocus,
     };
   });
 
@@ -258,6 +306,14 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
     const vertical = Math.abs(a[0] - b[0]) < Math.abs(a[1] - b[1]) * 0.3;
     labels.push({ x: vertical ? mx - 10 : mx, y: vertical ? my : my - 10, text: d.text, kind: 'dim', anchor: vertical ? 'end' : 'middle' });
+  }
+  for (const e of extra3) {
+    const a = T(project3(view, ...e.a)), b = T(project3(view, ...e.b));
+    lines.push({ x1: a[0], y1: a[1], x2: b[0], y2: b[1], kind: e.kind });
+  }
+  for (const l of extraLabels3) {
+    const p = T(project3(view, ...l.p));
+    labels.push({ x: p[0], y: p[1], text: l.text, kind: 'focus', anchor: 'middle' });
   }
   if (opts.showIds) {
     const seen = new Set<string>();
@@ -289,10 +345,14 @@ export function sceneToSvg(scene: Scene, theme: 'dark' | 'light' | 'transparent'
   parts.push(`<title>${esc(scene.ariaLabel)}</title>`);
   parts.push(`<defs><marker id="ms-arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="none" stroke="${dim}" stroke-width="1.2"/></marker></defs>`);
   if (theme !== 'transparent') parts.push(`<rect width="100%" height="100%" fill="${bg}"/>`);
-  for (const p of scene.polygons) parts.push(`<polygon data-part-id="${esc(p.partId)}" points="${p.points.map((x) => x.join(',')).join(' ')}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${p.selected ? 2.4 : 1}" stroke-linejoin="round"/>`);
-  for (const l of scene.lines) parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${dim}" stroke-width="1.3" marker-start="url(#ms-arrow)" marker-end="url(#ms-arrow)"/>`);
+  for (const p of scene.polygons) parts.push(`<polygon data-part-id="${esc(p.partId)}" points="${p.points.map((x) => x.join(',')).join(' ')}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${p.selected ? 2.4 : 1}" stroke-linejoin="round"${p.dim ? ' opacity="0.18"' : ''}/>`);
+  for (const l of scene.lines) {
+    if (l.kind === 'edge') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#ff9f43" stroke-width="3" stroke-linecap="round"/>`);
+    else if (l.kind === 'diag') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#5fd4ef" stroke-width="2" stroke-dasharray="8 5"/>`);
+    else parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${dim}" stroke-width="1.3" marker-start="url(#ms-arrow)" marker-end="url(#ms-arrow)"/>`);
+  }
   for (const t of scene.labels) {
-    const style = t.kind === 'title' ? `font-size="18" fill="${txt}" font-weight="700"` : t.kind === 'subtitle' ? `font-size="12" fill="${txt}" opacity="0.75"` : t.kind === 'dim' ? `font-size="14" font-weight="700" fill="${dim}" stroke="${bg}" stroke-width="3.5" paint-order="stroke"` : `font-size="10.5" fill="#ffffff" stroke="#0b1218" stroke-width="3" paint-order="stroke"`;
+    const style = t.kind === 'focus' ? `font-size="12" font-weight="700" fill="#ffffff" stroke="#0b1218" stroke-width="3.5" paint-order="stroke"` : t.kind === 'title' ? `font-size="18" fill="${txt}" font-weight="700"` : t.kind === 'subtitle' ? `font-size="12" fill="${txt}" opacity="0.75"` : t.kind === 'dim' ? `font-size="14" font-weight="700" fill="${dim}" stroke="${bg}" stroke-width="3.5" paint-order="stroke"` : `font-size="10.5" fill="#ffffff" stroke="#0b1218" stroke-width="3" paint-order="stroke"`;
     parts.push(`<text x="${t.x}" y="${t.y}" text-anchor="${t.anchor}" ${style}>${esc(t.text)}</text>`);
   }
   parts.push('</svg>');

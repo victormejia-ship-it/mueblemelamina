@@ -41,6 +41,12 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await expect(page.getByTestId('equipment-seccionadora')).toContainText('Kerf 4 mm');
   const [routeSvg] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-route').click()]);
   expect(routeSvg.suggestedFilename()).toMatch(/ruta-de-taller\.svg$/);
+  // Dónde se usa la canteadora en el modelo
+  await page.getByTestId('equipment-model-canteadora').click();
+  await expect(page.getByTestId('model-sheet')).toBeVisible();
+  await expect(page.getByTestId('model-sheet').locator('line[data-kind="edge"]').first()).toBeAttached();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('model-sheet')).toBeHidden();
   await page.getByTestId('tab-model').click();
 
   // Error bloqueante si W <= 2T
@@ -130,6 +136,12 @@ test('página general del taller', async ({ page }) => {
   await page.goto('/taller');
   await expect(page.getByTestId('route-flow')).toContainText('Instalación en obra');
   await expect(page.getByTestId('equipment-canteadora')).toContainText('Seguridad');
+  await page.getByTestId('equipment-model-medidor-diagonales').click();
+  await expect(page.getByTestId('model-sheet').locator('line[data-kind="diag"]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Cerrar' }).click();
+  await page.getByText('Canteado').first().click();
+  await page.getByTestId('station-model-canteado').click();
+  await expect(page.getByTestId('model-sheet')).toContainText('canto');
 });
 
 test('portada: catálogo con búsqueda, categorías y proyectos recientes', async ({ page }) => {
