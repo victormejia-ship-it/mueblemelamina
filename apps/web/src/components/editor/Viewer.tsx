@@ -2,14 +2,15 @@
 import { useMemo, useState } from 'react';
 import { DEFAULT_CATALOG, type ProjectCalculation, type Project } from '@ms/domain';
 import { buildScene, sceneToSvg, type ViewKind } from '@ms/geometry';
-import { Button, Hint } from '../ui';
+import { Download, EyeOff, Hash, Layers } from 'lucide-react';
+import { Hint } from '../ui';
 
 export function Viewer({ project, calc, selected, onSelect }: { project: Project; calc: ProjectCalculation; selected: string | null; onSelect: (id: string | null) => void }) {
   const [view, setView] = useState<ViewKind>('iso');
   const [exploded, setExploded] = useState(false);
   const [showIds, setShowIds] = useState(false);
   const [hideFronts, setHideFronts] = useState(false);
-  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view, exploded, showIds, hideFronts, selectedPartId: selected }), [project, calc, view, exploded, showIds, hideFronts, selected]);
+  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view, exploded, showIds, hideFronts, selectedPartId: selected, noTitle: true }), [project, calc, view, exploded, showIds, hideFronts, selected]);
   const views: { v: ViewKind; label: string }[] = [{ v: 'iso', label: 'Isométrico' }, { v: 'front', label: 'Frente' }, { v: 'side', label: 'Lateral' }, { v: 'top', label: 'Planta' }];
 
   function downloadSvg() {
@@ -30,10 +31,13 @@ export function Viewer({ project, calc, selected, onSelect }: { project: Project
               className={`rounded-lg px-2.5 py-1 text-[12.5px] font-semibold ${view === x.v ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}>{x.label}</button>
           ))}
         </div>
-        <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" checked={exploded} onChange={(e) => setExploded(e.target.checked)} data-testid="toggle-exploded" />Despiece separado</label>
-        <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" checked={showIds} onChange={(e) => setShowIds(e.target.checked)} />IDs de pieza</label>
-        <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" checked={hideFronts} onChange={(e) => setHideFronts(e.target.checked)} />Ocultar frentes</label>
-        <Button variant="secondary" onClick={downloadSvg}>Descargar SVG de esta vista</Button>
+        <button type="button" aria-pressed={exploded} onClick={() => setExploded(!exploded)} title="Separar piezas" aria-label="Separar piezas" data-testid="toggle-exploded"
+          className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${exploded ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><Layers aria-hidden className="h-4 w-4" /><span className="hidden sm:inline">Separar piezas</span></button>
+        <button type="button" aria-pressed={showIds} onClick={() => setShowIds(!showIds)} title="IDs" aria-label="IDs"
+          className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${showIds ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><Hash aria-hidden className="h-4 w-4" /><span className="hidden sm:inline">IDs</span></button>
+        <button type="button" aria-pressed={hideFronts} onClick={() => setHideFronts(!hideFronts)} title="Sin frentes" aria-label="Sin frentes"
+          className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${hideFronts ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><EyeOff aria-hidden className="h-4 w-4" /><span className="hidden sm:inline">Sin frentes</span></button>
+        <button type="button" onClick={downloadSvg} title="Descargar SVG de esta vista" aria-label="Descargar SVG de esta vista" className="flex h-8 items-center rounded-lg bg-[#253541] px-2"><Download aria-hidden className="h-4 w-4" /></button>
       </div>
       <div className="overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_50%_40%,#304555,#14202a_75%)]">
         <svg viewBox={`0 0 ${scene.width} ${scene.height}`} className="h-auto w-full max-h-[620px]" role="img" aria-label={scene.ariaLabel} data-testid="model-svg" fontFamily="Inter, system-ui, sans-serif">

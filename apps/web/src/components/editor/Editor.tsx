@@ -1,19 +1,20 @@
 'use client';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_CATALOG, createModule, nextModuleId, planProject,
   type ModuleSpec, type PricingSettings, type Project, type ProjectRevisionRecord, type SupplierOffer,
 } from '@ms/domain';
 import { errorMessage } from '@/lib/api';
 import { getDataClient } from '@/lib/data';
-import { Alert, Badge, Button, Panel, Stat, quoteTone, releaseLabel, releaseTone } from '../ui';
+import { Alert, Button, Panel, releaseLabel } from '../ui';
 import { ModuleForm, ModuleList } from './ModulePanel';
 import { Viewer } from './Viewer';
 import { AssemblyTab, CutTab, HardwareTab, MachiningTab, PartsTab } from './ProductionTabs';
 import { ExportTab, HistoryTab, OffersTab, QualityTab, QuoteTab } from './CommercialTabs';
 import { WorkshopTab } from './WorkshopTab';
-import { Box, Calculator, Download, Drill, Factory, Hammer, History, List, Scissors, ShieldCheck, Store, Wrench } from 'lucide-react';
+import { ArrowLeft, Box, Calculator, Check, CloudOff, Download, Drill, Factory, Hammer, History, List, LoaderCircle, Scissors, ShieldCheck, Store, Wrench } from 'lucide-react';
+import { QuickDims } from './QuickDims';
 
 const TABS = [
   { id: 'model', label: 'Modelo', icon: Box },
@@ -59,24 +60,39 @@ export function Editor({ initial }: { initial: Project }) {
     } catch (e) { return { plan: null, calcError: errorMessage(e) }; }
   }, [project, offers, today]);
 
+  // Contador de cambios: permite guardar en segundo plano sin perder lo que se edita mientras tanto.
+  const version = useRef(0);
+  const [saveFailed, setSaveFailed] = useState(false);
   const update = useCallback((p: Project) => {
     if (readOnly) return;
+    version.current++;
     setProject(p);
     setDirty(true);
     setNotice(null);
+    setSaveFailed(false);
   }, [readOnly]);
   const updateModule = (m: ModuleSpec) => update({ ...project, modules: project.modules.map((x) => (x.id === m.id ? m : x)) });
   const updatePricing = (pr: PricingSettings) => update({ ...project, pricing: pr });
 
   const save = useCallback(async (): Promise<boolean> => {
     if (readOnly) return false;
+    const v = version.current;
     setSaving(true); setError(null);
     try {
       const saved = await (await getDataClient()).saveProject(project, savedAt);
-      setProject(saved); setSavedAt(saved.updatedAt); setDirty(false); setNotice('Guardado.');
+      setSavedAt(saved.updatedAt);
+      if (version.current === v) { setProject(saved); setDirty(false); }
+      else setProject((cur) => ({ ...cur, updatedAt: saved.updatedAt })); // hubo cambios durante el guardado: se guardan después
       return true;
-    } catch (e) { setError(`No se guardó: ${errorMessage(e)}`); return false; } finally { setSaving(false); }
+    } catch (e) { setError(`No se guardó: ${errorMessage(e)}`); setSaveFailed(true); return false; } finally { setSaving(false); }
   }, [project, savedAt, readOnly]);
+
+  // Guardado automático 1.2 s después del último cambio (se detiene si falla, hasta el siguiente cambio).
+  useEffect(() => {
+    if (!dirty || readOnly || saving || saveFailed) return;
+    const t = setTimeout(() => { void save(); }, 1200);
+    return () => clearTimeout(t);
+  }, [project, dirty, readOnly, saving, saveFailed, save]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); void save(); } };
@@ -104,21 +120,33 @@ export function Editor({ initial }: { initial: Project }) {
   }
 
   const mod = project.modules.find((m) => m.id === selectedModule) ?? project.modules[0] ?? null;
+  /** Punto de estado en pestañas: Calidad (liberación) y Presupuesto (cotización). */
+  const dot = (id: string) => {
+    if (!plan) return null;
+    const tone = id === 'qc' ? (plan.calc.releaseStatus === 'NO_FABRICABLE' ? 'bg-err' : plan.calc.releaseStatus === 'LIBERADO_CON_APROBACION' ? 'bg-ok' : 'bg-warn')
+      : id === 'quote' ? (plan.quote.completeness === 'COMPLETO' ? 'bg-ok' : 'bg-warn') : null;
+    const label = id === 'qc' ? releaseLabel[plan.calc.releaseStatus] : id === 'quote' ? `Cotización ${plan.quote.completeness.toLowerCase()}` : '';
+    return tone ? <span className={`h-2 w-2 rounded-full ${tone}`} title={label} aria-label={label} role="img" /> : null;
+  };
   const calc = plan?.calc;
 
   return (
     <div className="grid gap-3">
-      <div className="flex flex-wrap items-end justify-between gap-3 no-print">
-        <div className="flex flex-wrap items-end gap-3">
-          <Link href="/proyectos" className="pb-1 text-[12.5px] text-[#bce8f2] underline">← Mis proyectos</Link>
-          <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Proyecto<input data-testid="project-name" className="!w-72 text-[15px] font-bold" value={project.name} maxLength={160} onChange={(e) => update({ ...project, name: e.target.value })} disabled={readOnly} /></label>
-          <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Cliente<input className="!w-48" value={project.customer} maxLength={160} onChange={(e) => update({ ...project, customer: e.target.value })} disabled={readOnly} /></label>
-          <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Obra<input className="!w-48" value={project.site} maxLength={240} onChange={(e) => update({ ...project, site: e.target.value })} disabled={readOnly} /></label>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-muted" aria-live="polite" data-testid="save-state">{readOnly ? 'Solo lectura' : saving ? 'Guardando…' : dirty ? 'Cambios sin guardar' : 'Guardado'}</span>
-          <Button onClick={save} disabled={saving || !dirty || readOnly} data-testid="save">Guardar</Button>
-        </div>
+      <div className="flex flex-wrap items-center gap-2 no-print">
+        <Link href="/proyectos" aria-label="Mis proyectos" title="Mis proyectos" className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[#22313e]"><ArrowLeft className="h-5 w-5" /></Link>
+        <input data-testid="project-name" aria-label="Nombre del proyecto" className="!w-auto min-w-0 flex-1 !border-transparent !bg-transparent !px-1 text-[18px] font-bold hover:!border-line focus:!border-accent sm:max-w-md" value={project.name} maxLength={160} onChange={(e) => update({ ...project, name: e.target.value })} disabled={readOnly} />
+        <span aria-live="polite" data-testid="save-state" className={`flex items-center gap-1 rounded-full px-2 py-1 text-[12px] font-semibold ${saveFailed ? 'bg-err-bg text-err' : dirty || saving ? 'text-muted' : 'text-ok'}`}>
+          {readOnly ? 'Solo lectura' : saveFailed ? <><CloudOff aria-hidden className="h-3.5 w-3.5" />No guardado</> : saving || dirty ? <><LoaderCircle aria-hidden className="h-3.5 w-3.5 animate-spin" />Guardando…</> : <><Check aria-hidden className="h-3.5 w-3.5" />Guardado</>}
+        </span>
+        {saveFailed && <Button onClick={save} data-testid="save">Reintentar</Button>}
+        {!saveFailed && <button type="button" onClick={save} disabled={saving || !dirty || readOnly} data-testid="save" className="sr-only">Guardar</button>}
+        <details className="relative w-full sm:w-auto">
+          <summary className="cursor-pointer list-none text-[12.5px] font-semibold text-[#bce8f2] [&::-webkit-details-marker]:hidden">{project.customer || project.site ? `${project.customer}${project.customer && project.site ? ' · ' : ''}${project.site}` : '+ Cliente y obra'}</summary>
+          <div className="mt-2 grid gap-2 sm:absolute sm:z-20 sm:w-80 sm:rounded-xl sm:border sm:border-line sm:bg-panel sm:p-3">
+            <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Cliente<input value={project.customer} maxLength={160} onChange={(e) => update({ ...project, customer: e.target.value })} disabled={readOnly} /></label>
+            <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Obra<input value={project.site} maxLength={240} onChange={(e) => update({ ...project, site: e.target.value })} disabled={readOnly} /></label>
+          </div>
+        </details>
       </div>
       {viewing && (
         <Alert tone="info">
@@ -132,7 +160,7 @@ export function Editor({ initial }: { initial: Project }) {
       {calcError && <Alert tone="err">Error de cálculo: {calcError}</Alert>}
 
       <div className="grid gap-3 lg:grid-cols-[330px_minmax(0,1fr)]">
-        <aside className="grid content-start gap-3 no-print">
+        <aside className="order-2 grid content-start gap-3 no-print lg:order-1">
           <Panel title="Módulos">
             <fieldset disabled={readOnly}>
               <ModuleList modules={project.modules} results={calc?.modules ?? []} selected={mod?.id ?? null} onSelect={setSelectedModule}
@@ -146,17 +174,11 @@ export function Editor({ initial }: { initial: Project }) {
           {mod && <Panel title={`Configurar ${mod.id}`}><fieldset disabled={readOnly}><ModuleForm key={mod.id} m={mod} onChange={updateModule} /></fieldset></Panel>}
         </aside>
 
-        <Panel className="min-w-0">
-          {calc && plan && (
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Badge tone={releaseTone(calc.releaseStatus)}>{releaseLabel[calc.releaseStatus]}</Badge>
-              <Badge tone={quoteTone(plan.quote.completeness)}>Cotización {plan.quote.completeness}</Badge>
-            </div>
-          )}
-          <div role="tablist" aria-label="Secciones del proyecto" className="mb-3 flex flex-wrap gap-1.5 no-print">
+        <Panel className="order-1 min-w-0 lg:order-2">
+          <div role="tablist" aria-label="Secciones del proyecto" className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 no-print lg:flex-wrap lg:overflow-visible">
             {TABS.map((t) => (
               <button key={t.id} id={`tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={`panel-${t.id}`} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`}
-                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold ${tab === t.id ? 'bg-accent text-accent-ink' : 'bg-[#253541] text-[#e5edf3] hover:bg-[#2d4150]'}`}><t.icon aria-hidden className="h-4 w-4" />{t.label}</button>
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold ${tab === t.id ? 'bg-accent text-accent-ink' : 'bg-[#253541] text-[#e5edf3] hover:bg-[#2d4150]'}`}><t.icon aria-hidden className="h-4 w-4" />{t.label}{dot(t.id)}</button>
             ))}
           </div>
           <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
@@ -164,13 +186,14 @@ export function Editor({ initial }: { initial: Project }) {
               <>
                 {tab === 'model' && (
                   <div className="grid gap-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Stat label="Piezas totales" value={calc.totals.panelCount} />
-                      <Stat label="Modelos de corte" value={calc.totals.partModels} />
-                      <Stat label="Tableros (acomodo)" value={plan.nesting.map((n) => `${n.sheetsRequired ?? '?'}× ${n.thicknessMm}mm`).join(' · ') || '—'} />
-                      <Stat label="Conjunto" value={`${project.modules.reduce((s, m) => s + m.widthMm, 0)} mm de ancho`} />
-                      <Stat label="Peso de tableros" value={`${Math.round(calc.modules.reduce((s, m) => s + m.weightKg, 0) * 10) / 10} kg`} />
-                      <Stat label="Verificación dimensional" value={<span data-testid="checks-summary">{calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'error').length ? `${calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'error').length} error(es)` : calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'warning').length ? `${calc.modules.flatMap((m) => m.checks).filter((c) => c.status === 'warning').length} aviso(s)` : 'Todo cuadra'}</span>} />
+                    {mod && <QuickDims modules={project.modules} selected={mod.id} onSelect={setSelectedModule} onChange={updateModule} disabled={readOnly} />}
+                    <div className="flex flex-wrap gap-1.5 text-[12.5px]">
+                      <span className="rounded-full bg-panel-2 px-2.5 py-1"><strong>{calc.totals.panelCount}</strong> piezas</span>
+                      {plan.nesting.map((n) => <span key={n.materialId} className="rounded-full bg-panel-2 px-2.5 py-1"><strong>{n.sheetsRequired ?? '?'}</strong> tablero{n.sheetsRequired === 1 ? '' : 's'} {n.thicknessMm} mm</span>)}
+                      <span className="rounded-full bg-panel-2 px-2.5 py-1"><strong>{Math.round(calc.modules.reduce((s, m) => s + m.weightKg, 0))}</strong> kg</span>
+                      {(() => { const all = calc.modules.flatMap((m) => m.checks); const e = all.filter((c) => c.status === 'error').length; const w = all.filter((c) => c.status === 'warning').length; return (
+                        <button type="button" onClick={() => setTab('qc')} data-testid="checks-summary" className={`rounded-full px-2.5 py-1 font-semibold ${e ? 'bg-err-bg text-err' : w ? 'bg-warn-bg text-warn' : 'bg-ok-bg text-ok'}`}>{e ? `${e} error(es)` : w ? `${w} aviso(s)` : 'Todo cuadra'}</button>
+                      ); })()}
                     </div>
                     {calc.issues.filter((i) => i.severity === 'error').map((i, k) => <Alert key={k} tone="err">{i.moduleId ? `${i.moduleId}: ` : ''}{i.message}</Alert>)}
                     <Viewer project={project} calc={calc} selected={selectedPart} onSelect={setSelectedPart} />
