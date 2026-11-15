@@ -90,3 +90,18 @@ describe('exportaciones', () => {
     expect(bytes.length).toBeGreaterThan(5000);
   });
 });
+
+describe('miniaturas del catálogo', () => {
+  it('cada familia genera una miniatura sin textos ni fondo, adaptable', async () => {
+    const { FAMILIES, calculateProject } = await import('@ms/domain');
+    const { thumbnailSvg } = await import('@ms/geometry');
+    for (const f of FAMILIES) {
+      const p = createProject({ id: 't', name: f.name, familyId: f.id, now: NOW }, cat);
+      const svg = thumbnailSvg(p, calculateProject(p, cat), cat);
+      expect(svg, f.id).toMatch(/^<svg[^>]+width="100%" height="100%"/);
+      expect(svg, f.id).not.toMatch(/<text|<rect width="100%"/);
+      expect((svg.match(/<polygon/g) ?? []).length, f.id).toBeGreaterThan(5);
+      expect(svg.length, f.id).toBeLessThan(40000);
+    }
+  });
+});

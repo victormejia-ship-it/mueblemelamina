@@ -1,11 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-async function createProject(page: Page, name: string) {
+async function createProject(page: Page, _name: string, family = 'kitchen_base') {
   await page.goto('/');
-  await page.getByLabel('Nombre del proyecto').fill(name);
-  await page.getByLabel('Plantilla inicial').selectOption('kitchen_base');
-  await page.getByRole('button', { name: 'Crear y abrir editor' }).click();
+  await page.getByTestId(`family-${family}`).click();
   await page.waitForURL(/\/editor\/?\?id=/);
   await expect(page.getByTestId('model-svg')).toBeVisible();
 }
@@ -133,4 +131,24 @@ test('página general del taller', async ({ page }) => {
   await page.goto('/taller');
   await expect(page.getByTestId('route-flow')).toContainText('Instalación en obra');
   await expect(page.getByTestId('equipment-canteadora')).toContainText('Seguridad');
+});
+
+test('portada: catálogo con búsqueda, categorías y proyectos recientes', async ({ page }) => {
+  await page.goto('/');
+  const grid = page.getByTestId('catalog-grid');
+  await expect(grid.locator('li')).toHaveCount(19);
+  await expect(grid.locator('svg').first()).toBeVisible();
+  await page.getByTestId('catalog-search').fill('closet');
+  await expect(grid.locator('li')).toHaveCount(1);
+  await expect(grid).toContainText('Clóset');
+  await page.getByTestId('catalog-search').fill('');
+  await page.getByTestId('cat-kitchen').click();
+  await expect(grid.locator('li')).toHaveCount(4);
+  await page.getByTestId('cat-all').click();
+  await page.getByTestId('family-desk').click();
+  await page.waitForURL(/\/editor\/?\?id=/);
+  await page.goto('/');
+  await expect(page.getByRole('region', { name: 'Continuar' })).toContainText('Escritorio');
+  await page.goto('/proyectos');
+  await expect(page.getByTestId('project-list')).toContainText('Escritorio');
 });
