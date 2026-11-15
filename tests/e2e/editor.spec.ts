@@ -186,3 +186,19 @@ test('editor: medidas rápidas junto al dibujo y guardado automático', async ({
   await page.reload();
   await expect(page.getByTestId('quick-height')).toHaveValue('1750');
 });
+test('render 3D del mueble', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('family-kitchen_base').click();
+  await page.getByTestId('view-render').click();
+  await expect(page.getByTestId('render-canvas').or(page.getByTestId('render-unavailable'))).toBeVisible({ timeout: 20_000 });
+  if (await page.getByTestId('render-canvas').isVisible()) {
+    await page.getByRole('radio', { name: 'Nogal (veta)' }).click();
+    await page.getByTestId('render-doors').click();
+    await expect(page.getByTestId('render-doors')).toHaveText('Cerrar puertas');
+    const [img] = await Promise.all([page.waitForEvent('download'), page.getByTestId('render-snapshot').click()]);
+    expect(img.suggestedFilename()).toMatch(/-render\.png$/);
+  }
+  await page.getByRole('radio', { name: 'Isométrico' }).click();
+  await expect(page.getByTestId('model-svg')).toBeVisible();
+});
+
