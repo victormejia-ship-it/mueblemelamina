@@ -17,3 +17,4 @@ export * from './render';
 export * from './repository';
 export * from './workshop/equipment';
 export * from './workshop/route';
+export * from './workshop/focus';

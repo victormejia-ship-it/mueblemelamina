@@ -7,7 +7,7 @@ import { saveBlob } from '@/lib/data/exports';
 import { Boxes, Download, TriangleAlert, Wrench } from 'lucide-react';
 import { STATION_ICON } from '../icons';
 import { BigStat, Button, Hint } from '../ui';
-import { EquipmentGrid, RouteFlow } from '../workshop/WorkshopViews';
+import { EquipmentGrid, RouteFlow, WorkshopModelProvider } from '../workshop/WorkshopViews';
 
 /** Taller del proyecto: ruta de fabricación y equipo, a la vista lo esencial y el detalle a un toque. */
 export function WorkshopTab({ plan, project }: { plan: ManufacturingPlan; project: Project }) {
@@ -17,6 +17,7 @@ export function WorkshopTab({ plan, project }: { plan: ManufacturingPlan; projec
   const kg = Math.round(plan.calc.modules.reduce((s, m) => s + m.weightKg, 0));
   const Ruta = STATION_ICON.corte;
   return (
+    <WorkshopModelProvider project={project} calc={plan.calc}>
     <div className="grid gap-5" data-testid="workshop-tab">
       <div className="flex flex-wrap items-center gap-2">
         <BigStat icon={<Ruta className="h-5 w-5" />} value={route.stations.length} label="pasos" tone="info" />
@@ -29,7 +30,7 @@ export function WorkshopTab({ plan, project }: { plan: ManufacturingPlan; projec
         </div>
       </div>
       <section>
-        <div className="mb-2 flex items-center gap-2"><h2 className="text-[16px] font-bold">Ruta</h2><Hint label="Cómo leerla">Se sigue de arriba abajo. Toca un paso para ver qué equipo usa y todas sus cifras. Los avisos en amarillo son lo que no hay que pasar por alto.</Hint></div>
+        <div className="mb-2 flex items-center gap-2"><h2 className="text-[16px] font-bold">Ruta</h2><Hint label="Cómo leerla">Se sigue de arriba abajo. Toca un paso para ver qué equipo usa, sus cifras y dónde se aplica en el modelo. Los avisos en amarillo son lo que no hay que pasar por alto.</Hint></div>
         <RouteFlow stations={route.stations} />
       </section>
       <section>
@@ -37,5 +38,6 @@ export function WorkshopTab({ plan, project }: { plan: ManufacturingPlan; projec
         <EquipmentGrid needs={route.equipment} />
       </section>
     </div>
+    </WorkshopModelProvider>
   );
 }

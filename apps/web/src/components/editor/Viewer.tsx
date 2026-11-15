@@ -1,16 +1,16 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { DEFAULT_CATALOG, type ProjectCalculation, type Project } from '@ms/domain';
+import { DEFAULT_CATALOG, type ModelFocus, type ProjectCalculation, type Project } from '@ms/domain';
 import { buildScene, sceneToSvg, type ViewKind } from '@ms/geometry';
 import { Download, EyeOff, Hash, Layers } from 'lucide-react';
 import { Hint } from '../ui';
 
-export function Viewer({ project, calc, selected, onSelect }: { project: Project; calc: ProjectCalculation; selected: string | null; onSelect: (id: string | null) => void }) {
+export function Viewer({ project, calc, selected, onSelect, focus = null }: { project: Project; calc: ProjectCalculation; selected: string | null; onSelect: (id: string | null) => void; focus?: ModelFocus | null }) {
   const [view, setView] = useState<ViewKind>('iso');
   const [exploded, setExploded] = useState(false);
   const [showIds, setShowIds] = useState(false);
   const [hideFronts, setHideFronts] = useState(false);
-  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view, exploded, showIds, hideFronts, selectedPartId: selected, noTitle: true }), [project, calc, view, exploded, showIds, hideFronts, selected]);
+  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view, exploded, showIds, hideFronts, selectedPartId: selected, noTitle: true, focus }), [project, calc, view, exploded, showIds, hideFronts, selected, focus]);
   const views: { v: ViewKind; label: string }[] = [{ v: 'iso', label: 'Isométrico' }, { v: 'front', label: 'Frente' }, { v: 'side', label: 'Lateral' }, { v: 'top', label: 'Planta' }];
 
   function downloadSvg() {
@@ -43,15 +43,17 @@ export function Viewer({ project, calc, selected, onSelect }: { project: Project
         <svg viewBox={`0 0 ${scene.width} ${scene.height}`} className="h-auto w-full max-h-[620px]" role="img" aria-label={scene.ariaLabel} data-testid="model-svg" fontFamily="Inter, system-ui, sans-serif">
           <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#ffbe66" strokeWidth="1.2" /></marker></defs>
           {scene.polygons.map((p) => (
-            <polygon key={p.key} data-part-id={p.partId} points={p.points.map((x) => x.join(',')).join(' ')} fill={p.fill} stroke={p.stroke} strokeWidth={p.selected ? 2.4 : 1} strokeLinejoin="round"
+            <polygon key={p.key} data-part-id={p.partId} points={p.points.map((x) => x.join(',')).join(' ')} fill={p.fill} stroke={p.stroke} strokeWidth={p.selected ? 2.4 : 1} strokeLinejoin="round" opacity={p.dim ? 0.18 : 1}
               className="cursor-pointer" onClick={() => onSelect(p.partId === selected ? null : p.partId)}>
               <title>{p.partId}</title>
             </polygon>
           ))}
-          {scene.lines.map((l, i) => <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ffbe66" strokeWidth={1.3} markerStart="url(#arrow)" markerEnd="url(#arrow)" />)}
+          {scene.lines.map((l, i) => l.kind === 'edge' ? <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ff9f43" strokeWidth={3} strokeLinecap="round" data-kind="edge" />
+            : l.kind === 'diag' ? <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#5fd4ef" strokeWidth={2} strokeDasharray="8 5" data-kind="diag" />
+            : <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ffbe66" strokeWidth={1.3} markerStart="url(#arrow)" markerEnd="url(#arrow)" />)}
           {scene.labels.map((t, i) => (
             <text key={i} x={t.x} y={t.y} textAnchor={t.anchor}
-              {...(t.kind === 'title' ? { fontSize: 17, fill: '#a7dae4', fontWeight: 700 } : t.kind === 'subtitle' ? { fontSize: 12, fill: '#c8d3df' } : t.kind === 'dim' ? { fontSize: 14, fill: '#ffe0a9', fontWeight: 700, stroke: '#17202a', strokeWidth: 3.5, paintOrder: 'stroke' } : { fontSize: 10.5, fill: '#fff', stroke: '#0b1218', strokeWidth: 3, paintOrder: 'stroke', pointerEvents: 'none' })}>
+              {...(t.kind === 'focus' ? { fontSize: 13, fill: '#fff', fontWeight: 700, stroke: '#0b1218', strokeWidth: 3.5, paintOrder: 'stroke', pointerEvents: 'none' } : t.kind === 'title' ? { fontSize: 17, fill: '#a7dae4', fontWeight: 700 } : t.kind === 'subtitle' ? { fontSize: 12, fill: '#c8d3df' } : t.kind === 'dim' ? { fontSize: 14, fill: '#ffe0a9', fontWeight: 700, stroke: '#17202a', strokeWidth: 3.5, paintOrder: 'stroke' } : { fontSize: 10.5, fill: '#fff', stroke: '#0b1218', strokeWidth: 3, paintOrder: 'stroke', pointerEvents: 'none' })}>
               {t.text}
             </text>
           ))}

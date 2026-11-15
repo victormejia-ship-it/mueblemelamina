@@ -1,13 +1,43 @@
 'use client';
-import { useState } from 'react';
-import { EQUIPMENT, STATIONS, type EquipmentItem, type EquipmentNeed, type NeedLevel, type RouteStation, type StationDefinition, type StationId } from '@ms/domain';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { Box } from 'lucide-react';
+import { EQUIPMENT, STATIONS, equipmentFocus, stationFocus, type ModelFocus, type Project, type ProjectCalculation, type EquipmentItem, type EquipmentNeed, type NeedLevel, type RouteStation, type StationDefinition, type StationId } from '@ms/domain';
 import { PPE_INFO, STATION_ICON, TriangleAlert } from '../icons';
 import { Badge, type Tone } from '../ui';
+import { ModelSheet, type ModelTarget } from './ModelSheet';
 
 const NEED_TONE: Record<NeedLevel, Tone> = { esencial: 'ok', recomendado: 'info', opcional: 'neutral' };
 const NEED_LABEL: Record<NeedLevel, string> = { esencial: 'Esencial', recomendado: 'Recomendado', opcional: 'Opcional' };
 const equipmentName = (id: string) => EQUIPMENT.find((e) => e.id === id)?.name ?? id;
 const anchor = (id: string) => `equipo-${id}`;
+
+interface ModelCtx { calc: ProjectCalculation; open: (t: ModelTarget) => void }
+const ModelContext = createContext<ModelCtx | null>(null);
+
+/** Da a la ruta y a las fichas de equipo un modelo donde señalar dónde se usa cada cosa. */
+export function WorkshopModelProvider({ project, calc, children }: { project: Project; calc: ProjectCalculation; children: ReactNode }) {
+  const [target, setTarget] = useState<ModelTarget | null>(null);
+  const close = useCallback(() => setTarget(null), []);
+  const value = useMemo(() => ({ calc, open: setTarget }), [calc]);
+  return (
+    <ModelContext.Provider value={value}>
+      {children}
+      <ModelSheet target={target} project={project} calc={calc} onClose={close} />
+    </ModelContext.Provider>
+  );
+}
+
+function ModelButton({ title, focus, testId }: { title: string; focus: (calc: ProjectCalculation) => ModelFocus; testId: string }) {
+  const ctx = useContext(ModelContext);
+  const f = useMemo(() => (ctx ? focus(ctx.calc) : null), [ctx, focus]);
+  if (!ctx || !f || f.empty) return null;
+  return (
+    <button type="button" onClick={() => ctx.open({ title, focus: f })} data-testid={testId}
+      className="flex w-fit items-center gap-1.5 rounded-lg border border-[#3c6074] bg-[#162a36] px-2.5 py-1 text-[12.5px] font-semibold text-[#bce8f2] hover:bg-[#1d3140]">
+      <Box aria-hidden className="h-4 w-4" />Ver en el modelo
+    </button>
+  );
+}
 
 type FlowStation = (RouteStation | (StationDefinition & { number: number; equipmentIds: string[]; metrics?: RouteStation['metrics']; highlights?: string[]; alerts?: string[]; parallel?: boolean }));
 
@@ -47,6 +77,7 @@ export function RouteFlow({ stations }: { stations: FlowStation[] }) {
                 <div className="flex flex-wrap gap-1.5">
                   {s.equipmentIds.map((id) => <a key={id} href={`#${anchor(id)}`} className="rounded-full border border-[#3c6074] px-2 py-0.5 text-[11.5px] font-semibold text-[#bce8f2] hover:underline">{equipmentName(id)}</a>)}
                 </div>
+                <ModelButton title={s.name} focus={(c) => stationFocus(s.id, s.equipmentIds, c)} testId={`station-model-${s.id}`} />
                 {!!s.metrics?.length && (
                   <dl className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
                     {s.metrics.map((m) => <div key={m.label} className="flex gap-1.5"><dt className="text-muted">{m.label}:</dt><dd className="font-semibold">{m.value}</dd></div>)}
@@ -119,6 +150,7 @@ export function EquipmentCard({ item, need }: { item: EquipmentItem; need?: Equi
       </header>
       <StepChain steps={item.steps} />
       <PpeRow item={item} />
+      <ModelButton title={item.name} focus={(c) => equipmentFocus(item.id, c)} testId={`equipment-model-${item.id}`} />
       <details className="group mt-auto">
         <summary className="cursor-pointer list-none text-[12.5px] font-semibold text-[#bce8f2] [&::-webkit-details-marker]:hidden">
           <span className="group-open:hidden">Ver detalles ▾</span><span className="hidden group-open:inline">Ocultar detalles ▴</span>
