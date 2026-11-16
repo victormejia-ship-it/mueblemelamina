@@ -13,7 +13,8 @@ import { Viewer } from './Viewer';
 import { AssemblyTab, CutTab, HardwareTab, MachiningTab, PartsTab } from './ProductionTabs';
 import { ExportTab, HistoryTab, OffersTab, QualityTab, QuoteTab } from './CommercialTabs';
 import { WorkshopTab } from './WorkshopTab';
-import { ArrowLeft, Box, Calculator, Check, CloudOff, Download, Drill, Factory, Hammer, History, List, LoaderCircle, Scissors, ShieldCheck, Store, Wrench } from 'lucide-react';
+import { PriceTab } from './PriceTab';
+import { ArrowLeft, BadgeDollarSign, Box, Calculator, Check, CloudOff, Download, Drill, Factory, Hammer, History, List, LoaderCircle, Scissors, ShieldCheck, Store, Wrench } from 'lucide-react';
 import { QuickDims } from './QuickDims';
 
 const TABS = [
@@ -26,6 +27,7 @@ const TABS = [
   { id: 'workshop', label: 'Taller', icon: Factory },
   { id: 'offers', label: 'Proveedores', icon: Store },
   { id: 'quote', label: 'Presupuesto', icon: Calculator },
+  { id: 'price', label: 'Precio de venta', icon: BadgeDollarSign },
   { id: 'qc', label: 'Calidad', icon: ShieldCheck },
   { id: 'export', label: 'Exportar', icon: Download },
   { id: 'history', label: 'Historial', icon: History },
@@ -207,6 +209,7 @@ export function Editor({ initial }: { initial: Project }) {
                 {tab === 'workshop' && <WorkshopTab plan={plan} project={project} />}
                 {tab === 'offers' && <OffersTab plan={plan} project={project} offers={offers} today={today} onPricing={updatePricing} />}
                 {tab === 'quote' && <QuoteTab plan={plan} project={project} onPricing={updatePricing} saved={!dirty && !readOnly} />}
+                {tab === 'price' && <PriceTab plan={plan} project={project} onPricing={updatePricing} readOnly={readOnly} />}
                 {tab === 'qc' && <QualityTab plan={plan} project={project} onProject={update} />}
                 {tab === 'export' && <ExportTab project={project} dirty={dirty} onSave={save} revisionId={viewing?.id ?? null} />}
                 {tab === 'history' && (

@@ -22,7 +22,7 @@ export interface SceneOptions {
   /** Sin título ni subtítulo (cuando la interfaz ya los muestra). */
   noTitle?: boolean;
   /** Enfoque de una herramienta: resalta piezas, cantos y diagonales y atenúa el resto. */
-  focus?: Pick<ModelFocus, 'partIds' | 'edges' | 'diagonals' | 'labels'> | null;
+  focus?: Pick<ModelFocus, 'partIds' | 'edges' | 'diagonals' | 'labels' | 'led'> | null;
 }
 
 export type Pt = [number, number];
@@ -39,7 +39,7 @@ export interface ScenePolygon {
   /** Atenuado (fuera del enfoque de la herramienta). */
   dim?: boolean;
 }
-export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' | 'edge' | 'diag' }
+export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' | 'edge' | 'diag' | 'led' }
 export interface SceneLabel { x: number; y: number; text: string; kind: 'dim' | 'id' | 'title' | 'subtitle' | 'focus'; anchor: 'start' | 'middle' | 'end' }
 
 export interface Scene {
@@ -232,7 +232,16 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   // Enfoque de herramienta: cantos de piezas resaltadas y diagonales del frente de cada caja (coordenadas 3D)
   const focus = opts.focus ?? null;
   const focusSet = new Set(focus?.partIds ?? []);
-  const extra3: { a: [number, number, number]; b: [number, number, number]; kind: 'edge' | 'diag' }[] = [];
+  const extra3: { a: [number, number, number]; b: [number, number, number]; kind: 'edge' | 'diag' | 'led' }[] = [];
+  // Ranuras LED (router): siempre visibles en el modelo armado para saber dónde se fresa.
+  if (!opts.exploded && !opts.minimal) {
+    for (const r of calc.ledRuns) {
+      const m = calc.modules.find((x) => x.moduleId === r.moduleId);
+      if (!m) continue;
+      const mv = (p: [number, number, number]): [number, number, number] => [p[0] + m.offsetXMm, p[1] + m.offsetYMm, p[2]];
+      extra3.push({ a: mv(r.a), b: mv(r.b), kind: 'led' });
+    }
+  }
   const extraLabels3: { p: [number, number, number]; text: string }[] = [];
   if (focus) {
     for (const sld of solids) {
@@ -349,6 +358,7 @@ export function sceneToSvg(scene: Scene, theme: 'dark' | 'light' | 'transparent'
   for (const l of scene.lines) {
     if (l.kind === 'edge') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#ff9f43" stroke-width="3" stroke-linecap="round"/>`);
     else if (l.kind === 'diag') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#5fd4ef" stroke-width="2" stroke-dasharray="8 5"/>`);
+    else if (l.kind === 'led') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#ffd84d" stroke-width="3.5" stroke-linecap="round"/>`);
     else parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${dim}" stroke-width="1.3" marker-start="url(#ms-arrow)" marker-end="url(#ms-arrow)"/>`);
   }
   for (const t of scene.labels) {

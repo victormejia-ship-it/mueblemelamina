@@ -101,7 +101,8 @@ export type ValidationStatus = 'verified' | 'pending_validation' | 'blocked';
 export type HardwareCategory =
   | 'hinge' | 'drawer_slide' | 'cam_connector' | 'dowel' | 'shelf_pin' | 'handle' | 'leveler'
   | 'screw' | 'wall_anchor' | 'hanging_rail' | 'hanging_rail_support' | 'soft_close' | 'lift_system'
-  | 'plinth_clip' | 'adhesive';
+  | 'plinth_clip' | 'adhesive'
+  | 'led_strip' | 'led_profile' | 'led_driver' | 'led_sensor' | 'led_cable';
 
 export interface HingeRule { maxDoorHeightMm: Mm; hingesPerDoor: number }
 
@@ -123,6 +124,13 @@ export interface HardwareProduct {
     nominalLengthsMm?: Mm[];
     drawerBoxThicknessMm?: Mm;
     maxLoadKg?: number;
+    /** LED: potencia de la tira (W por metro). */
+    ledWattsPerM?: number;
+    /** LED: ranura de router que pide el perfil para empotrar (ancho × profundidad). */
+    grooveWidthMm?: Mm;
+    grooveDepthMm?: Mm;
+    /** LED: potencia nominal de la fuente (W). */
+    driverWatts?: number;
     /** Bisagras: tabla de cantidad por alto de puerta (fabricante). */
     hingeRules?: HingeRule[];
     /** Bisagras: espesor de puerta admitido [mín, máx] en mm. */
@@ -182,6 +190,17 @@ export interface SteelFrameSpec {
   finish: 'primer' | 'powder_coating' | 'paint' | 'none';
 }
 
+/** Dónde va la tira LED dentro del módulo. */
+export type LedPlacement = 'none' | 'under_cabinet' | 'shelves' | 'sides' | 'top_inside';
+export type LedSensor = 'none' | 'door' | 'hand' | 'touch';
+
+export interface LedSpec {
+  placement: LedPlacement;
+  stripProductId: string;
+  profileProductId: string;
+  sensor: LedSensor;
+}
+
 export interface ModuleSpec {
   id: string;
   label: string;
@@ -216,6 +235,8 @@ export interface ModuleSpec {
   /** Holguras de frentes. */
   revealMm: Mm;
   frontGapMm: Mm;
+  /** Iluminación LED empotrada (ranura de router + perfil de aluminio). */
+  led: LedSpec;
 }
 
 export type ProjectStatus = 'DRAFT_NOT_RELEASED_FOR_MANUFACTURING' | 'RELEASED_WITH_APPROVAL';
@@ -247,6 +268,8 @@ export interface PricingSettings {
   /** productKey -> offerId */
   selectedOffers: Record<string, string>;
   manualCosts: ManualCost[];
+  /** Costeo y precio de venta con referencias de mercado (Monterrey). */
+  market: import('./pricing/market').MarketSettings;
 }
 
 /** Parámetros de taller que afectan medidas de corte y validaciones (editables por proyecto). */
@@ -354,6 +377,25 @@ export interface MachiningOperation {
   technicalDatasheetUrl: string | null;
   validationStatus: ValidationStatus;
   description: string;
+  /** Ranura de router (para perfiles LED): largo, ancho y profundidad. */
+  groove?: { lengthMm: Mm; widthMm: Mm };
+}
+
+/** Tramo de LED empotrado: ranura de router en una pieza, con su posición en el módulo (mm). */
+export interface LedRun {
+  id: string;
+  moduleId: string;
+  partId: string;
+  /** Eje de la ranura, en coordenadas del módulo (x ancho, y fondo desde el frente, z alto). */
+  a: [Mm, Mm, Mm];
+  b: [Mm, Mm, Mm];
+  lengthMm: Mm;
+  grooveWidthMm: Mm;
+  grooveDepthMm: Mm;
+  /** Cara de la pieza donde se fresa, en palabras de taller. */
+  face: string;
+  /** Hacia dónde apunta la luz (para el render): eje y signo. */
+  lightDir: [number, number, number];
 }
 
 export interface HardwareRequirement {
@@ -428,6 +470,8 @@ export interface ModuleResult {
   checks: DimensionCheck[];
   /** Peso estimado de tableros (kg), con densidades típicas. */
   weightKg: number;
+  /** Tramos de LED empotrado (ranuras de router). */
+  ledRuns: LedRun[];
 }
 
 export interface EdgeBandTotal {
@@ -452,6 +496,8 @@ export interface ProjectCalculation {
   edgeBands: EdgeBandTotal[];
   issues: Issue[];
   releaseStatus: ReleaseStatus;
+  /** Tramos LED de todo el proyecto (coordenadas del módulo; sumar offsetXMm/offsetYMm del módulo). */
+  ledRuns: LedRun[];
   totals: { panelCount: number; partModels: number; panelAreaM2: number };
 }
 

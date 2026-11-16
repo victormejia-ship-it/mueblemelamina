@@ -2,6 +2,7 @@ import { catalogLookup, type Catalog, type CatalogLookup } from '../catalog';
 import { DEFAULT_MANUFACTURING } from '../project/factory';
 import type { Box3, DimensionCheck, EdgeName, FamilyDefinition, ManufacturingSettings, MaterialDefinition, ModuleResult, ModuleSpec, SteelRequirement } from '../types';
 import { box, ModuleBuilder, overlapVolume, r2 } from './helpers';
+import { applyLed } from './led';
 import { shelfSag } from './structural';
 import { verifyModule } from './verify';
 
@@ -38,7 +39,7 @@ export function calculateModule(spec: ModuleSpec, catalog: Catalog, offsetXMm = 
   const result = (fabricable: boolean, extra: Partial<ModuleResult> = {}): ModuleResult => ({
     moduleId: spec.id, offsetXMm, offsetYMm: 0, fabricable,
     parts: b.parts, hardware: b.hardware, machining: b.machining, steel: [], issues: b.issues,
-    theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, checks: [], weightKg: 0, ...extra,
+    theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, checks: [], weightKg: 0, ledRuns: [], ...extra,
   });
 
   const { widthMm: W, heightMm: H, depthMm: D, thicknessMm: T } = spec;
@@ -80,6 +81,7 @@ export function calculateModule(spec: ModuleSpec, catalog: Catalog, offsetXMm = 
     throw e;
   }
 
+  const ledRuns = applyLed(spec, L, b);
   checkSheetFit(ctx);
   checkCollisions(b);
   const v = verifyModule({
@@ -91,7 +93,7 @@ export function calculateModule(spec: ModuleSpec, catalog: Catalog, offsetXMm = 
   });
   for (const i of v.issues) b.issue(i);
   const fabricable = !b.issues.some((i) => i.severity === 'error');
-  return result(fabricable, { ...extra, checks: [...ctx.structuralChecks, ...v.checks], weightKg: v.weightKg });
+  return result(fabricable, { ...extra, checks: [...ctx.structuralChecks, ...v.checks], weightKg: v.weightKg, ledRuns });
 }
 
 interface Ctx {

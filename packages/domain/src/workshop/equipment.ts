@@ -165,6 +165,23 @@ export const EQUIPMENT: EquipmentItem[] = [
     alternatives: ['Taladro múltiple', 'Router CNC'],
     consumables: ['Broca Ø5 con tope'],
   },
+  {
+    id: 'router', name: 'Router (rebajadora) con guía paralela y fresa recta', category: 'mecanizado', station: 'mecanizado',
+    purpose: 'Fresar la ranura donde se empotra el perfil de aluminio de la tira LED y el canal del cable.',
+    steps: ['Marcar ranura', 'Fijar guía', 'Pasadas de 3 mm', 'Canal de cable', 'Probar perfil'],
+    ppe: ['gafas', 'auditiva', 'respirador'],
+    keySettings: [
+      'Ancho y profundidad de la ranura = medida del perfil comprado (el proyecto usa la del catálogo: confirmarla con calibrador)',
+      'Fresa recta de carburo; si es más angosta que la ranura, dos pasadas contra la guía',
+      'Profundidad final en pasadas de máximo 3 mm; deben quedar al menos 6 mm de tablero',
+      'Fresar después de cortar y cantear, antes de armar; referenciar siempre desde el canto frontal',
+      'Detener la ranura a 15 mm de cada extremo y unir con el canal de cable hacia el canto trasero',
+    ],
+    safety: ['Gafas y protección auditiva', 'Pieza sujeta con prensas; nunca sostenerla con la mano', 'Avanzar contra el giro de la fresa', EPP_POLVO],
+    qualityChecks: ['El perfil entra a presión, al ras de la cara', 'Ranura recta y paralela al canto frontal', 'Sin astillado de la melamina en los bordes'],
+    alternatives: ['Router CNC con programa validado', 'Perfil LED de sobreponer (sin ranura)', 'Sierra de mesa con disco de ranurar (sólo ranuras pasantes)'],
+    consumables: ['Fresa recta de carburo 6–12 mm', 'Cinta de pintor para evitar astillado', 'Perfil de prueba'],
+  },
   // --- Armado ---
   {
     id: 'atornillador', name: 'Taladro atornillador inalámbrico con embrague', category: 'armado', station: 'armado',

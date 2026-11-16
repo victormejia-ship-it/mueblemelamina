@@ -62,6 +62,9 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
   const cams = ops('cam-minifix');
   const pins = ops('shelf-pin-line-32');
   const slideOps = ops('slide-mount');
+  const ledGrooves = ops('led-groove-router');
+  const ledM = calc.ledRuns.reduce((t, r) => t + r.lengthMm, 0) / 1000;
+  const ledDriver = calc.hardware.filter((h) => h.category === 'led_driver');
   const hinges = calc.hardware.filter((h) => h.category === 'hinge');
   const hingeTotal = hinges.reduce((s, h) => s + h.quantity, 0);
   const halfHinges = hinges.filter((h) => h.productKey === 'hw:hinge_half_overlay_110').reduce((s, h) => s + h.quantity, 0);
@@ -85,7 +88,7 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
     preparacion: [plural(project.modules.length, 'módulo', 'módulos'), plural(thicknesses.length, 'espesor', 'espesores')],
     corte: [plural(calc.totals.panelCount, 'pieza', 'piezas'), plural(totalSheets, 'tablero', 'tableros')],
     canteado: [`${fmt(edgeM, 1)} m de canto`, plural(bands.reduce((s, b) => s + b.e.segments, 0), 'arista', 'aristas')],
-    mecanizado: [cups ? plural(cups, 'cazoleta', 'cazoletas') : '', cams ? plural(cams, 'excéntrico', 'excéntricos') : '', pins ? plural(pins, 'soporte', 'soportes') : ''].filter(Boolean).slice(0, 3),
+    mecanizado: [ledGrooves ? plural(ledGrooves, 'ranura LED', 'ranuras LED') : '', cups ? plural(cups, 'cazoleta', 'cazoletas') : '', cams ? plural(cams, 'excéntrico', 'excéntricos') : '', pins ? plural(pins, 'soporte', 'soportes') : ''].filter(Boolean).slice(0, 3),
     armado: [plural(project.modules.length, 'caja', 'cajas'), `diagonal ±${project.inspection.diagonalToleranceMm} mm`],
     herreria: plan.steel.map((s) => plural(s.layout.bars.length, 'barra', 'barras')).slice(0, 2),
     frentes: [hingeTotal ? plural(hingeTotal, 'bisagra', 'bisagras') : '', slides ? plural(slides, 'corredera', 'correderas') : '', handles ? plural(handles, 'jaladera', 'jaladeras') : ''].filter(Boolean),
@@ -121,13 +124,14 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
       alerts: smallForEdgebander ? [`${smallForEdgebander} pieza(s) pequeñas para la canteadora: cantear a mano o cortar sobremedida.`] : [],
     },
     mecanizado: {
-      include: calc.machining.length > 0, equipment: ['taladro-banco', ...(pins ? ['plantilla-system32'] : [])],
+      include: calc.machining.length > 0, equipment: ['taladro-banco', ...(pins ? ['plantilla-system32'] : []), ...(ledGrooves ? ['router'] : [])],
       metrics: [
         { label: 'Barrenos / operaciones', value: String(totalOps) },
         ...(cups ? [{ label: 'Cazoletas Ø35', value: String(cups) }] : []),
         ...(cams ? [{ label: 'Excéntricos', value: String(cams) }] : []),
         ...(pins ? [{ label: 'Soportes de entrepaño', value: String(pins) }] : []),
         ...(slideOps ? [{ label: 'Fijación de correderas', value: String(slideOps) }] : []),
+        ...(ledGrooves ? [{ label: 'Ranuras LED (router)', value: `${ledGrooves} · ${fmt(ledM, 2)} m + canal de cable` }] : []),
       ],
       alerts: pendingOps ? [`${pendingOps} operación(es) sin ficha técnica: NO perforar hasta capturar el patrón del herraje.`] : [],
     },
@@ -177,8 +181,9 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
         ...(anchors ? [{ label: 'Anclajes / colgadores', value: String(anchors) }] : []),
         ...(levelers ? [{ label: 'Patas niveladoras', value: String(levelers) }] : []),
         ...(wallModules ? [{ label: 'Módulos a muro', value: String(wallModules) }] : []),
+        ...(ledDriver.length ? [{ label: 'Fuente LED', value: ledDriver.map((d) => `${d.quantity} × ${d.description}`).join(' · ') }] : []),
       ],
-      alerts: anchors ? ['Elegir taquete según el muro y validar la carga del anclaje.'] : [],
+      alerts: [...(anchors ? ['Elegir taquete según el muro y validar la carga del anclaje.'] : []), ...(ledDriver.length ? ['Fuente LED: conexión a 127 V por electricista; dejarla ventilada y accesible.'] : [])],
     },
   };
 
@@ -203,6 +208,7 @@ export function workshopRoute(project: Project, plan: ManufacturingPlan, catalog
       need('refilador-manual', smallForEdgebander ? 'recomendado' : 'opcional', smallForEdgebander ? `${smallForEdgebander} pieza(s) pequeñas para máquina` : 'Reparaciones')] : []),
     ...(calc.machining.length ? [need('taladro-banco', 'esencial', `${totalOps} operaciones de perforación`, [...(cups ? [`${cups} cazoletas Ø35`] : []), ...(cams ? [`${cams} excéntricos`] : []), ...(pendingOps ? [`${pendingOps} pendientes de ficha: no perforar`] : [])])] : []),
     ...(pins ? [need('plantilla-system32', 'esencial', `${pins} barrenos para soportes de entrepaño`)] : []),
+    ...(ledGrooves ? [need('router', 'esencial', `${plural(ledGrooves, 'ranura LED', 'ranuras LED')} (${fmt(ledM, 2)} m)`, [...new Set(calc.ledRuns.map((r) => `Ranura ${r.grooveWidthMm} × ${r.grooveDepthMm} mm · ${r.face}`))].concat(['Pasadas de máx. 3 mm de profundidad']))] : []),
     need('atornillador', 'esencial', 'Armado y herrajes'),
     need('prensas', 'esencial', 'Armado a escuadra'),
     need('medidor-diagonales', 'esencial', 'Escuadra de caja', calc.modules.filter((m) => m.theoreticalDiagonalMm).map((m) => `${m.moduleId}: ${m.theoreticalDiagonalMm} mm teórica`)),
