@@ -70,7 +70,9 @@ describe('etiquetas de ID', () => {
     const ids = scene.labels.filter((l) => l.kind === 'id');
     expect(ids.length).toBeGreaterThan(3);
     // Los costados de caja de cajón quedan detrás de los frentes: no se etiquetan
-    expect(ids.some((l) => l.text.startsWith('DRAWER_SIDE'))).toBe(false);
+    expect(ids.some((l) => l.text.startsWith('COSTADO_CAJON'))).toBe(false);
+    expect(ids.some((l) => l.text.startsWith('FRENTE_CAJON'))).toBe(true);
+    expect(ids.every((l) => !/DRAWER|SIDE|HORIZONTAL/.test(l.text))).toBe(true);
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
       const a = ids[i]!, b = ids[j]!;
       const overlapX = Math.abs(a.x - b.x) < (a.text.length + b.text.length) * 3.05 + 6;
@@ -79,6 +81,8 @@ describe('etiquetas de ID', () => {
     }
     // Sin frentes, las cajas de cajón sí aparecen
     const open = buildScene(p, c, cat, { view: 'iso', exploded: false, showIds: true, hideFronts: true });
-    expect(open.labels.some((l) => l.kind === 'id' && l.text.startsWith('DRAWER'))).toBe(true);
+    expect(open.labels.some((l) => l.kind === 'id' && l.text.includes('CAJON'))).toBe(true);
+    const en = buildScene(p, c, cat, { view: 'iso', exploded: false, showIds: true, hideFronts: false, lang: 'en' });
+    expect(en.labels.some((l) => l.kind === 'id' && l.text.startsWith('DRAWER_FRONT'))).toBe(true);
   });
 });

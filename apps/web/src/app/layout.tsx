@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { AuthGate, AuthProvider, BackendBadge, UserMenu } from '@/components/Auth';
 import { MainNav } from '@/components/MainNav';
+import { LangProvider } from '@/lib/lang';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es-MX">
       <body className="min-h-screen font-sans">
+        <LangProvider>
         <AuthProvider>
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-accent focus:px-3 focus:py-1 focus:text-accent-ink">Saltar al contenido</a>
         <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-[#18212b]/95 px-4 py-2.5 backdrop-blur sm:px-8 sm:py-3">
@@ -33,6 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Medidas en mm · Revisar en taller antes de fabricar · Sin afiliación con proveedores
         </footer>
         </AuthProvider>
+        </LangProvider>
       </body>
     </html>
   );

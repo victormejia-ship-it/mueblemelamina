@@ -198,8 +198,10 @@ describe('exportaciones con medidas de corte y verificación', async () => {
     p.modules[0] = base({ edgeBandId: 'pvc22x2' });
     const plan = planProject(p, cat, [], '2026-01-01', NOW);
     const rows = parseCsv(partsCsv(plan, cat));
+    expect(rows.some((r) => r[0] === 'M01-COSTADO')).toBe(true);
     const h = rows[0]!;
-    const door = rows.find((r) => r[0] === 'M01-DOOR')!;
+    const door = rows.find((r) => r[0] === 'M01-PUERTA')!;
+    expect(door[h.indexOf('Rol')]).toBe('Frente');
     expect(door[h.indexOf('Ancho final (mm)')]).toBe('396.5');
     expect(door[h.indexOf('Ancho de corte (mm)')]).toBe('392.5');
     const checks = parseCsv(checksCsv(plan));

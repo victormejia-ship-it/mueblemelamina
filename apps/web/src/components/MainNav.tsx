@@ -1,13 +1,14 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Factory, FolderOpen, LayoutGrid, Store, type LucideIcon } from 'lucide-react';
+import { Factory, FolderOpen, LayoutGrid, Settings, Store, type LucideIcon } from 'lucide-react';
 
 const ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/', label: 'Catálogo', icon: LayoutGrid },
   { href: '/proyectos', label: 'Mis proyectos', icon: FolderOpen },
   { href: '/proveedores', label: 'Proveedores', icon: Store },
   { href: '/taller', label: 'Taller', icon: Factory },
+  { href: '/ajustes', label: 'Ajustes', icon: Settings },
 ];
 
 /** Navegación principal: arriba en pantallas anchas, barra inferior con íconos en teléfono. */
@@ -27,7 +28,7 @@ export function MainNav({ variant }: { variant: 'top' | 'bottom' }) {
     );
   }
   return (
-    <nav aria-label="Principal" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t border-line bg-[#18212b]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
+    <nav aria-label="Principal" className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-[#18212b]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
       {ITEMS.map((i) => (
         <Link key={i.href} href={i.href} aria-current={isActive(i.href) ? 'page' : undefined}
           className={`flex flex-col items-center gap-0.5 py-2 text-[10.5px] font-semibold ${isActive(i.href) ? 'text-[#60c6db]' : 'text-muted'}`}>

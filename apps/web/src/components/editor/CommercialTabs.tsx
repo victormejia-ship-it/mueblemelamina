@@ -1,10 +1,12 @@
 'use client';
 import { useState } from 'react';
 import {
+  QUOTE_LINE_STATUS_ES,
   QC_CHECKLIST, SUPPLIERS, diagonalChecks, evaluateOffers, formatMXN,
   type ManufacturingPlan, type PricingSettings, type Project, type ProjectRevisionRecord, type SupplierOffer,
 } from '@ms/domain';
 import { api, errorMessage } from '@/lib/api';
+import { useLang } from '@/lib/lang';
 import { IS_FIREBASE, getDataClient, type ExportFormat } from '@/lib/data';
 import { Alert, Badge, BigStat, Button, EmptyState, Hint, More, Stat, quoteTone, releaseLabel, releaseTone, severityLabel, severityTone } from '../ui';
 import { CircleCheck, CircleX, TriangleAlert } from '../icons';
@@ -60,6 +62,7 @@ export function OffersTab({ plan, project, offers, today, onPricing }: { plan: M
 }
 
 export function QuoteTab({ plan, project, onPricing, saved }: { plan: ManufacturingPlan; project: Project; onPricing: (p: PricingSettings) => void; saved: boolean }) {
+  const { t, lang } = useLang();
   const p = project.pricing;
   const q = plan.quote;
   const [server, setServer] = useState<string | null>(null);
@@ -111,13 +114,13 @@ export function QuoteTab({ plan, project, onPricing, saved }: { plan: Manufactur
               <td>{l.description}</td><td className="num">{l.requiredQuantity} {l.requiredUnit}</td><td className="num">{l.purchaseQuantity ?? '—'} {l.purchaseUnit ?? ''}</td>
               <td>{l.supplierId ? `${supplierName(l.supplierId)} · ${l.sku}` : '—'}</td><td className="num">{formatMXN(l.unitNetCents)}</td><td className="num">{formatMXN(l.lineNetCents)}</td>
               <td>{l.priceStatus ? <Badge tone={PRICE_STATUS_TONE[l.priceStatus]}>{l.priceStatus}</Badge> : <Badge tone="neutral">PENDIENTE</Badge>}</td>
-              <td><Badge tone={l.status === 'PRICED' ? 'ok' : l.status === 'ESTIMATED' ? 'info' : 'warn'}>{l.status}</Badge></td>
-              <td className="max-w-[280px] whitespace-normal text-[11px] text-muted">{l.notes.join(' · ')}</td>
+              <td><Badge tone={l.status === 'PRICED' ? 'ok' : l.status === 'ESTIMATED' ? 'info' : 'warn'}>{lang === 'en' ? l.status : QUOTE_LINE_STATUS_ES[l.status] ?? l.status}</Badge></td>
+              <td className="max-w-[280px] whitespace-normal text-[11px] text-muted">{t(l.notes.join(' · '))}</td>
             </tr>
           ))}</tbody>
         </table>
       </section>
-      {q.warnings.map((w) => <Alert key={w} tone="warn">{w}</Alert>)}
+      {q.warnings.map((w) => <Alert key={w} tone="warn">{t(w)}</Alert>)}
       {!IS_FIREBASE && <div className="flex flex-wrap items-center gap-2">
         <Button variant="secondary" disabled={!saved} title={saved ? '' : 'Guarde para validar en servidor'} onClick={async () => {
           try {
@@ -132,6 +135,7 @@ export function QuoteTab({ plan, project, onPricing, saved }: { plan: Manufactur
 }
 
 export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPlan; project: Project; onProject: (p: Project) => void }) {
+  const { t, lang } = useLang();
   const [moduleFilter, setModuleFilter] = useState('');
   const [appr, setAppr] = useState({ approvedBy: project.approval?.approvedBy ?? '', validationEvidence: project.approval?.validationEvidence ?? '' });
   const issues = plan.calc.issues.filter((i) => !moduleFilter || i.moduleId === moduleFilter);
@@ -151,7 +155,7 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
         </div>
         <ul className="grid gap-1.5" data-testid="issues-list">
           {[...issues].filter((i) => i.severity === 'error' || i.severity === 'blocker').sort((a, b) => order[a.severity] - order[b.severity]).map((i, k) => (
-            <li key={k} className="flex gap-2 text-[12.5px]"><Badge tone={severityTone(i.severity)}>{severityLabel[i.severity]}</Badge><span>{i.moduleId ? <strong>{i.moduleId} · </strong> : null}{i.message}</span></li>
+            <li key={k} className="flex gap-2 text-[12.5px]"><Badge tone={severityTone(i.severity)}>{severityLabel[i.severity]}</Badge><span>{i.moduleId ? <strong>{i.moduleId} · </strong> : null}{t(i.message)}</span></li>
           ))}
           {!issues.some((i) => i.severity === 'error' || i.severity === 'blocker') && <li className="text-[13px] text-ok">Sin errores ni validaciones pendientes.</li>}
         </ul>
@@ -159,7 +163,7 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
           <More summary={<>{issues.filter((i) => i.severity === 'warning').length} advertencias · {issues.filter((i) => i.severity === 'info').length} notas</>}>
             <ul className="grid gap-1.5">
               {[...issues].filter((i) => i.severity === 'warning' || i.severity === 'info').sort((a, b) => order[a.severity] - order[b.severity]).map((i, k) => (
-                <li key={k} className="flex gap-2 text-[12.5px]"><Badge tone={severityTone(i.severity)}>{severityLabel[i.severity]}</Badge><span>{i.moduleId ? <strong>{i.moduleId} · </strong> : null}{i.message} <code className="text-[10.5px] text-muted">{i.code}</code></span></li>
+                <li key={k} className="flex gap-2 text-[12.5px]"><Badge tone={severityTone(i.severity)}>{severityLabel[i.severity]}</Badge><span>{i.moduleId ? <strong>{i.moduleId} · </strong> : null}{t(i.message)}{lang === 'en' && <> <code className="text-[10.5px] text-muted">{i.code}</code></>}</span></li>
               ))}
             </ul>
           </More>
@@ -190,7 +194,7 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
                 <td><input aria-label={`Diagonal 1 ${d.moduleId}`} inputMode="decimal" defaultValue={d.d1Mm ?? ''} onBlur={(e) => set('d1Mm', e.target.value)} /></td>
                 <td><input aria-label={`Diagonal 2 ${d.moduleId}`} inputMode="decimal" defaultValue={d.d2Mm ?? ''} onBlur={(e) => set('d2Mm', e.target.value)} /></td>
                 <td className="num">{d.differenceMm ?? '—'}</td>
-                <td><Badge tone={d.result === 'PASA' ? 'ok' : d.result === 'NO_PASA' ? 'err' : 'neutral'}>{d.result}</Badge></td>
+                <td><Badge tone={d.result === 'PASA' ? 'ok' : d.result === 'NO_PASA' ? 'err' : 'neutral'}>{t(d.result)}</Badge></td>
               </tr>
             );
           })}</tbody>
@@ -216,13 +220,14 @@ export function QualityTab({ plan, project, onProject }: { plan: ManufacturingPl
 }
 
 export function ExportTab({ project, dirty, onSave, revisionId }: { project: Project; dirty: boolean; onSave: () => Promise<boolean>; revisionId?: string | null }) {
+  const { lang } = useLang();
   const [sep, setSep] = useState<',' | ';'>(';');
   const [msg, setMsg] = useState<string | null>(null);
   const [render, setRender] = useState<string | null>(null);
   const run = async (format: string, extra: Record<string, unknown> = {}) => {
     setMsg(null);
     if (dirty && !revisionId && !(await onSave())) return;
-    try { setMsg(`Descargado: ${await (await getDataClient()).exportProject(project.id, format as ExportFormat, { revisionId, separator: sep, ...extra })}`); } catch (e) { setMsg(errorMessage(e)); }
+    try { setMsg(`Descargado: ${await (await getDataClient()).exportProject(project.id, format as ExportFormat, { revisionId, separator: sep, lang, ...extra })}`); } catch (e) { setMsg(errorMessage(e)); }
   };
   const items: { f: string; label: string; desc: string; extra?: Record<string, unknown> }[] = [
     { f: 'pdf', label: 'PDF de fabricación', desc: 'Expediente: isométrico, despiece, tableros, herrajes, incidencias, presupuesto, armado y QC.' },
@@ -295,6 +300,7 @@ const STATUS_TONE = { ok: 'ok', info: 'info', warning: 'warn', error: 'err' } as
 const STATUS_LABEL = { ok: 'Cumple', info: 'Info', warning: 'Revisar', error: 'No cumple' } as const;
 
 function DimensionChecks({ plan, project, moduleFilter, onProject }: { plan: ManufacturingPlan; project: Project; moduleFilter: string; onProject: (p: Project) => void }) {
+  const { t } = useLang();
   const mf = project.manufacturing;
   const set = (patch: Partial<typeof mf>) => onProject({ ...project, manufacturing: { ...mf, ...patch } });
   const checks = plan.calc.modules.filter((m) => !moduleFilter || m.moduleId === moduleFilter).flatMap((m) => m.checks);
@@ -304,8 +310,8 @@ function DimensionChecks({ plan, project, moduleFilter, onProject }: { plan: Man
   const row = (c: (typeof checks)[number]) => (
     <tr key={c.id}>
       <td><Badge tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Badge></td>
-      <td className="whitespace-normal"><strong>{c.moduleId}</strong> · {c.label}</td>
-      <td className="whitespace-normal text-muted">{c.expected}</td><td className="whitespace-normal font-semibold">{c.actual}</td>
+      <td className="whitespace-normal"><strong>{c.moduleId}</strong> · {t(c.label)}</td>
+      <td className="whitespace-normal text-muted">{t(c.expected)}</td><td className="whitespace-normal font-semibold">{t(c.actual)}</td>
     </tr>
   );
   return (

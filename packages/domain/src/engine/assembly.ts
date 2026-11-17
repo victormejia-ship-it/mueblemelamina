@@ -1,4 +1,5 @@
 import type { ModuleSpec, Project, ProjectCalculation } from '../types';
+import { localizeIds, partCodeLabel, type CodeLang } from '../i18n';
 
 export interface AssemblyStep { id: string; title: string; detail: string; dependsOn: string[]; pending?: boolean }
 
@@ -41,23 +42,24 @@ const mmId = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_');
 const mmLabel = (s: string) => s.replace(/"/g, "'");
 
 /** Diagrama Mermaid de dependencias pieza → subconjunto → pasos. */
-export function mermaidDiagram(project: Project, calc: ProjectCalculation): string {
+export function mermaidDiagram(project: Project, calc: ProjectCalculation, lang: CodeLang = 'es'): string {
+  const CORE = lang === 'en' ? 'CORE' : 'CAJA', FRONT = lang === 'en' ? 'FRONT' : 'FRENTES';
   const out = ['flowchart TD'];
   for (const spec of project.modules) {
     const mod = calc.modules.find((m) => m.moduleId === spec.id);
     if (!mod) continue;
     const m = mmId(spec.id);
     out.push(`  subgraph ${m}["${mmLabel(`${spec.id} · ${spec.label}`)}"]`);
-    out.push(`    ${m}_CORE["Caja / núcleo"]`, `    ${m}_FRONT["Frentes y accesorios"]`);
+    out.push(`    ${m}_${CORE}["Caja / núcleo"]`, `    ${m}_${FRONT}["Frentes y accesorios"]`);
     for (const p of mod.parts) {
-      const group = p.role === 'front' || p.role === 'drawer_box' ? 'FRONT' : 'CORE';
-      out.push(`    ${mmId(p.id)}["${mmLabel(`${p.code} ×${p.quantity}`)}"] --> ${m}_${group}`);
+      const group = p.role === 'front' || p.role === 'drawer_box' ? FRONT : CORE;
+      out.push(`    ${mmId(localizeIds(p.id, lang))}["${mmLabel(`${partCodeLabel(p.code, lang)} ×${p.quantity}`)}"] --> ${m}_${group}`);
     }
     const steps = assemblySteps(spec, calc);
     for (const st of steps) out.push(`    ${m}_${st.id}["${mmLabel(`${st.id} ${st.title}`)}${st.pending ? ' ⚠' : ''}"]`);
     for (const st of steps) for (const d of st.dependsOn) out.push(`    ${m}_${d} --> ${m}_${st.id}`);
-    out.push(`    ${m}_CORE --> ${m}_S05`);
-    out.push(`    ${m}_FRONT --> ${m}_${steps.at(-1)?.id ?? 'S13'}`);
+    out.push(`    ${m}_${CORE} --> ${m}_S05`);
+    out.push(`    ${m}_${FRONT} --> ${m}_${steps.at(-1)?.id ?? 'S13'}`);
     out.push('  end');
   }
   return out.join('\n');

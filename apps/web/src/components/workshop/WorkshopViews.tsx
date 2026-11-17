@@ -5,6 +5,7 @@ import { EQUIPMENT, STATIONS, equipmentFocus, stationFocus, type ModelFocus, typ
 import { PPE_INFO, STATION_ICON, TriangleAlert } from '../icons';
 import { Badge, type Tone } from '../ui';
 import { ModelSheet, type ModelTarget } from './ModelSheet';
+import { useLang } from '@/lib/lang';
 
 const NEED_TONE: Record<NeedLevel, Tone> = { esencial: 'ok', recomendado: 'info', opcional: 'neutral' };
 const NEED_LABEL: Record<NeedLevel, string> = { esencial: 'Esencial', recomendado: 'Recomendado', opcional: 'Opcional' };
@@ -51,6 +52,7 @@ function StationIcon({ id, className = 'h-5 w-5' }: { id: StationId; className?:
  * Los avisos siempre se ven; el detalle (objetivo, equipo, todas las cifras) se abre al tocar.
  */
 export function RouteFlow({ stations }: { stations: FlowStation[] }) {
+  const { t } = useLang();
   return (
     <ol className="grid" aria-label="Ruta de taller" data-testid="route-flow">
       {stations.map((s, i) => (
@@ -68,7 +70,7 @@ export function RouteFlow({ stations }: { stations: FlowStation[] }) {
                   {s.parallel && <span className="text-[11px] font-semibold text-warn">en paralelo</span>}
                 </span>
                 <span className="flex flex-wrap gap-1.5">
-                  {s.highlights?.map((h) => <span key={h} className="rounded-full bg-[#1d3140] px-2 py-0.5 text-[12px] font-semibold text-[#cfeff7]">{h}</span>)}
+                  {s.highlights?.map((h) => <span key={h} className="rounded-full bg-[#1d3140] px-2 py-0.5 text-[12px] font-semibold text-[#cfeff7]">{t(h)}</span>)}
                 </span>
                 <span aria-hidden className="ml-auto text-muted transition-transform group-open:rotate-180">▾</span>
               </summary>
@@ -80,13 +82,13 @@ export function RouteFlow({ stations }: { stations: FlowStation[] }) {
                 <ModelButton title={s.name} focus={(c) => stationFocus(s.id, s.equipmentIds, c)} testId={`station-model-${s.id}`} />
                 {!!s.metrics?.length && (
                   <dl className="grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
-                    {s.metrics.map((m) => <div key={m.label} className="flex gap-1.5"><dt className="text-muted">{m.label}:</dt><dd className="font-semibold">{m.value}</dd></div>)}
+                    {s.metrics.map((m) => <div key={m.label} className="flex gap-1.5"><dt className="text-muted">{m.label}:</dt><dd className="font-semibold">{t(m.value)}</dd></div>)}
                   </dl>
                 )}
               </div>
             </details>
             {s.alerts?.map((a) => (
-              <p key={a} className="mt-1 flex items-start gap-1.5 rounded-lg bg-warn-bg px-2 py-1 text-[12px] text-warn"><TriangleAlert aria-hidden className="mt-[1px] h-3.5 w-3.5 shrink-0" />{a}</p>
+              <p key={a} className="mt-1 flex items-start gap-1.5 rounded-lg bg-warn-bg px-2 py-1 text-[12px] text-warn"><TriangleAlert aria-hidden className="mt-[1px] h-3.5 w-3.5 shrink-0" />{t(a)}</p>
             ))}
           </div>
         </li>
@@ -136,6 +138,7 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
 
 /** Ficha de equipo: lo esencial a la vista (pasos, EPP); el resto en «Detalles». */
 export function EquipmentCard({ item, need }: { item: EquipmentItem; need?: EquipmentNeed }) {
+  const { t } = useLang();
   return (
     <article id={anchor(item.id)} className="flex scroll-mt-20 flex-col gap-2 rounded-xl border border-line bg-panel-2 p-3" data-testid={`equipment-${item.id}`}>
       <header className="flex items-start justify-between gap-2">
@@ -157,7 +160,7 @@ export function EquipmentCard({ item, need }: { item: EquipmentItem; need?: Equi
         </summary>
         <div className="mt-2 grid gap-2.5">
           <p className="text-[12.5px] text-muted">{item.purpose}</p>
-          <ListBlock title="Con los datos de este proyecto" items={need?.projectSettings ?? []} />
+          <ListBlock title="Con los datos de este proyecto" items={(need?.projectSettings ?? []).map(t)} />
           <ListBlock title="Puntos críticos" items={item.keySettings} />
           <ListBlock title="Revisar al terminar" items={item.qualityChecks} />
           <ListBlock title="Seguridad" items={item.safety} />

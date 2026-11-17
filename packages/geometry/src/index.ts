@@ -3,7 +3,7 @@
  * Nunca altera el BOM: cada polígono proviene de una pieza con su ID.
  * Es un esquema axonométrico/ortogonal 2D, NO un modelo CAD 3D ni un plano CNC.
  */
-import { catalogLookup, type Box3, type Catalog, type ModelFocus, type PanelPart, type Project, type ProjectCalculation } from '@ms/domain';
+import { catalogLookup, partCodeLabel, type Box3, type CodeLang, type Catalog, type ModelFocus, type PanelPart, type Project, type ProjectCalculation } from '@ms/domain';
 
 export type ViewKind = 'iso' | 'front' | 'side' | 'top';
 
@@ -23,6 +23,8 @@ export interface SceneOptions {
   noTitle?: boolean;
   /** Enfoque de una herramienta: resalta piezas, cantos y diagonales y atenúa el resto. */
   focus?: Pick<ModelFocus, 'partIds' | 'edges' | 'diagonals' | 'labels' | 'led'> | null;
+  /** Idioma de los códigos de pieza en las etiquetas (español por defecto). */
+  lang?: CodeLang;
 }
 
 export type Pt = [number, number];
@@ -185,7 +187,7 @@ const polyArea = (pts: Pt[]) => Math.abs(pts.reduce((a, p, i) => { const q = pts
  * Etiquetas de ID legibles: una por pieza visible, sobre su cara más grande que se ve.
  * Se omiten las piezas tapadas por otras (p. ej. costados detrás de los frentes) y las que se encimarían con otra etiqueta.
  */
-function idLabels(ordered: Solid[], polys: { key: string; pts: Pt[] }[], partsById: Map<string, PanelPart>, taken: SceneLabel[]): SceneLabel[] {
+function idLabels(ordered: Solid[], polys: { key: string; pts: Pt[] }[], partsById: Map<string, PanelPart>, taken: SceneLabel[], lang: CodeLang): SceneLabel[] {
   const out: SceneLabel[] = [];
   const box = (x: number, y: number, text: string) => { const w = text.length * 6.1 + 6; return { x0: x - w / 2, x1: x + w / 2, y0: y - 9, y1: y + 5 }; };
   const boxes = taken.map((l) => box(l.x, l.y, l.text));
@@ -198,7 +200,7 @@ function idLabels(ordered: Solid[], polys: { key: string; pts: Pt[] }[], partsBy
     if (s.role === 'steel') { if (seenSteel.has(s.partId)) continue; seenSteel.add(s.partId); }
     const own = (idx.get(s.key) ?? []).map((i) => ({ i, a: polyArea(polys[i]!.pts) })).sort((a, b) => b.a - a.a);
     const part = partsById.get(s.partId);
-    const text = part ? `${part.code}${part.quantity > 1 ? `·${s.key.split('#')[1]}` : ''}` : 'PTR';
+    const text = part ? `${partCodeLabel(part.code, lang)}${part.quantity > 1 ? `·${s.key.split('#')[1]}` : ''}` : 'PTR';
     for (const { i, a } of own) {
       const pts = polys[i]!.pts;
       // Caras delgadas (cantos): grosor ≈ 2·área/perímetro; si no cabe el texto, no llevan etiqueta.
@@ -370,7 +372,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     const p = T(project3(view, ...l.p));
     labels.push({ x: p[0], y: p[1], text: l.text, kind: 'focus', anchor: 'middle' });
   }
-  if (opts.showIds) labels.push(...idLabels(ordered, rawPolys.map((r) => ({ key: r.s.key, pts: r.pts.map(T) })), partsById, [...labels]));
+  if (opts.showIds) labels.push(...idLabels(ordered, rawPolys.map((r) => ({ key: r.s.key, pts: r.pts.map(T) })), partsById, [...labels], opts.lang ?? 'es'));
   if (!opts.minimal && !opts.noTitle) labels.unshift(
     { x: 24, y: 34, text: opts.title ?? project.name, kind: 'title', anchor: 'start' },
     { x: 24, y: 56, text: `${({ iso: 'Isométrico', front: 'Vista frontal', side: 'Vista lateral derecha', top: 'Planta' } as const)[view]} esquemático · cotas en mm${opts.exploded ? ' · despiece separado' : ''}`, kind: 'subtitle', anchor: 'start' },

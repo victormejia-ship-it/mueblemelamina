@@ -16,6 +16,7 @@ import { WorkshopTab } from './WorkshopTab';
 import { PriceTab } from './PriceTab';
 import { ArrowLeft, BadgeDollarSign, Box, Calculator, Check, CloudOff, Download, Drill, Factory, Hammer, History, List, LoaderCircle, Scissors, ShieldCheck, Store, Wrench } from 'lucide-react';
 import { QuickDims } from './QuickDims';
+import { useLang } from '@/lib/lang';
 
 const TABS = [
   { id: 'model', label: 'Modelo', icon: Box },
@@ -35,6 +36,7 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 export function Editor({ initial }: { initial: Project }) {
+  const { t } = useLang();
   const [project, setProject] = useState<Project>(initial);
   const [savedAt, setSavedAt] = useState(initial.updatedAt);
   const [dirty, setDirty] = useState(false);
@@ -197,7 +199,7 @@ export function Editor({ initial }: { initial: Project }) {
                         <button type="button" onClick={() => setTab('qc')} data-testid="checks-summary" className={`rounded-full px-2.5 py-1 font-semibold ${e ? 'bg-err-bg text-err' : w ? 'bg-warn-bg text-warn' : 'bg-ok-bg text-ok'}`}>{e ? `${e} error(es)` : w ? `${w} aviso(s)` : 'Todo cuadra'}</button>
                       ); })()}
                     </div>
-                    {calc.issues.filter((i) => i.severity === 'error').map((i, k) => <Alert key={k} tone="err">{i.moduleId ? `${i.moduleId}: ` : ''}{i.message}</Alert>)}
+                    {calc.issues.filter((i) => i.severity === 'error').map((i, k) => <Alert key={k} tone="err">{i.moduleId ? `${i.moduleId}: ` : ''}{t(i.message)}</Alert>)}
                     <Viewer project={project} calc={calc} selected={selectedPart} onSelect={setSelectedPart} />
                   </div>
                 )}

@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import {
-  CALC_VERSION, EQUIPMENT, QC_CHECKLIST, assemblySteps, catalogLookup, diagonalChecks, formatMXN, workshopRoute,
+  CALC_VERSION, EQUIPMENT, HW_CATEGORY_ES, QUOTE_LINE_STATUS_ES, VALIDATION_ES, enumLabel, localizeIds, type CodeLang, QC_CHECKLIST, assemblySteps, catalogLookup, diagonalChecks, formatMXN, workshopRoute,
   type Catalog, type ManufacturingPlan, type Project,
 } from '@ms/domain';
 import { buildScene } from '@ms/geometry';
@@ -22,16 +22,16 @@ const M = 36;
 class Writer {
   page!: PDFPage;
   y = 0;
-  constructor(readonly doc: PDFDocument, readonly font: PDFFont, readonly bold: PDFFont, readonly footer: string) { this.newPage(); }
+  constructor(readonly doc: PDFDocument, readonly font: PDFFont, readonly bold: PDFFont, readonly footer: string, readonly loc: (s: string) => string = (s) => s) { this.newPage(); }
   newPage() {
     this.page = this.doc.addPage(A4);
     this.y = A4[1] - M;
-    this.page.drawText(pdfSafe(this.footer), { x: M, y: 18, size: 7, font: this.font, color: rgb(0.4, 0.4, 0.4) });
+    this.page.drawText(pdfSafe(this.loc(this.footer)), { x: M, y: 18, size: 7, font: this.font, color: rgb(0.4, 0.4, 0.4) });
   }
   ensure(h: number) { if (this.y - h < M + 10) this.newPage(); }
   text(s: string, size = 9, bold = false, color = rgb(0.1, 0.13, 0.16)) {
     const f = bold ? this.bold : this.font;
-    for (const line of wrap(pdfSafe(s), f, size, A4[0] - 2 * M)) {
+    for (const line of wrap(pdfSafe(this.loc(s)), f, size, A4[0] - 2 * M)) {
       this.ensure(size + 4);
       this.page.drawText(line, { x: M, y: this.y - size, size, font: f, color });
       this.y -= size + 3;
@@ -45,7 +45,7 @@ class Writer {
     const ws = widths.map((w) => w * scale);
     const drawRow = (cells: string[], bold: boolean) => {
       const f = bold ? this.bold : this.font;
-      const wrapped = cells.map((c, i) => wrap(pdfSafe(c), f, size, ws[i]! - 4));
+      const wrapped = cells.map((c, i) => wrap(pdfSafe(this.loc(c)), f, size, ws[i]! - 4));
       const h = Math.max(...wrapped.map((w) => w.length)) * (size + 2) + 4;
       this.ensure(h);
       if (bold) this.page.drawRectangle({ x: M, y: this.y - h, width: A4[0] - 2 * M, height: h, color: rgb(0.9, 0.94, 0.96) });
@@ -89,7 +89,7 @@ function hexRgb(hex: string) {
 }
 
 /** Expediente de fabricación PDF (A4). Marca explícitamente el estado de liberación. */
-export async function buildPdf(project: Project, plan: ManufacturingPlan, catalog: Catalog, generatedAt: string): Promise<Uint8Array> {
+export async function buildPdf(project: Project, plan: ManufacturingPlan, catalog: Catalog, generatedAt: string, lang: CodeLang = 'es'): Promise<Uint8Array> {
   const L = catalogLookup(catalog);
   const doc = await PDFDocument.create();
   doc.setTitle(`Expediente ${project.name}`);
@@ -98,7 +98,7 @@ export async function buildPdf(project: Project, plan: ManufacturingPlan, catalo
   doc.setModificationDate(new Date(generatedAt));
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const w = new Writer(doc, font, bold, `Modular Studio · ${project.name} · cálculo ${CALC_VERSION} · ${generatedAt.slice(0, 10)} · Documento ${plan.calc.releaseStatus}. No sustituye cálculo estructural ni fichas de herraje.`);
+  const w = new Writer(doc, font, bold, `Modular Studio · ${project.name} · cálculo ${CALC_VERSION} · ${generatedAt.slice(0, 10)} · Documento ${plan.calc.releaseStatus}. No sustituye cálculo estructural ni fichas de herraje.`, (x) => localizeIds(x, lang));
 
   w.text('MODULAR STUDIO — EXPEDIENTE DE FABRICACIÓN', 15, true, rgb(0.06, 0.32, 0.4));
   w.text(`${project.name} · Cliente: ${project.customer || '—'} · Obra: ${project.site || '—'}`, 10, true);
@@ -108,7 +108,7 @@ export async function buildPdf(project: Project, plan: ManufacturingPlan, catalo
   w.text(`ESTADO: ${status}${status === 'LIBERADO_CON_APROBACION' && project.approval ? ` por ${project.approval.approvedBy} (${project.approval.approvedAt.slice(0, 10)})` : ' — NO LIBERADO PARA FABRICACIÓN'}`, 10, true, status === 'LIBERADO_CON_APROBACION' ? rgb(0.1, 0.45, 0.2) : rgb(0.7, 0.2, 0.1));
 
   // Isométrico vectorial a partir de la misma escena del editor
-  const scene = buildScene(project, plan.calc, catalog, { view: 'iso', exploded: false, showIds: false, hideFronts: false, width: 900, height: 560 });
+  const scene = buildScene(project, plan.calc, catalog, { view: 'iso', exploded: false, showIds: false, hideFronts: false, width: 900, height: 560, lang });
   const s = (A4[0] - 2 * M) / scene.width;
   w.ensure(scene.height * s + 10);
   const top = w.y;
@@ -150,7 +150,7 @@ export async function buildPdf(project: Project, plan: ManufacturingPlan, catalo
 
   w.h2('Herrajes (cantidades orientativas salvo ficha validada)');
   w.table(['Módulo', 'Categoría', 'Descripción', 'Cant.', 'Unidad', 'Regla', 'Estado'],
-    plan.calc.hardware.map((h) => [h.moduleId, h.category, h.description, String(h.quantity), h.unit, h.basis, h.validationStatus]), [35, 55, 120, 30, 30, 150, 60]);
+    plan.calc.hardware.map((h) => [h.moduleId, enumLabel(HW_CATEGORY_ES, h.category, lang), h.description, String(h.quantity), h.unit, h.basis, enumLabel(VALIDATION_ES, h.validationStatus, lang)]), [35, 55, 120, 30, 30, 150, 60]);
 
   if (plan.steel.length) {
     w.h2('Herrería (requiere validación estructural)');
@@ -181,7 +181,7 @@ export async function buildPdf(project: Project, plan: ManufacturingPlan, catalo
   const q = plan.quote;
   w.text(`Estado: ${q.completeness}${q.completeness !== 'COMPLETO' ? ' — los importes son parciales o de simulación; NO es una cotización comercial vigente.' : ''}`, 9, true, q.completeness === 'COMPLETO' ? rgb(0.1, 0.45, 0.2) : rgb(0.7, 0.2, 0.1));
   w.table(['Concepto', 'Cant. compra', 'Proveedor / SKU', 'Neto unit.', 'Importe neto', 'Estado'],
-    q.lines.filter((l) => l.status !== 'NOT_APPLICABLE').map((l) => [l.description, l.purchaseQuantity === null ? `${l.requiredQuantity} ${l.requiredUnit}` : `${l.purchaseQuantity} ${l.purchaseUnit ?? ''}`, l.supplierId ? `${l.supplierId} ${l.sku ?? ''}` : '—', formatMXN(l.unitNetCents), formatMXN(l.lineNetCents), `${l.status}${l.priceStatus ? ` (${l.priceStatus})` : ''}`]),
+    q.lines.filter((l) => l.status !== 'NOT_APPLICABLE').map((l) => [l.description, l.purchaseQuantity === null ? `${l.requiredQuantity} ${l.requiredUnit}` : `${l.purchaseQuantity} ${l.purchaseUnit ?? ''}`, l.supplierId ? `${l.supplierId} ${l.sku ?? ''}` : '—', formatMXN(l.unitNetCents), formatMXN(l.lineNetCents), `${enumLabel(QUOTE_LINE_STATUS_ES, l.status, lang)}${l.priceStatus ? ` (${l.priceStatus})` : ''}`]),
     [150, 55, 85, 55, 60, 80]);
   w.text(`Costo directo neto: ${formatMXN(q.directCostNetCents)} · Venta antes de IVA (${q.mode === 'margin' ? `margen ${q.marginPct} % sobre venta` : `markup ${q.markupPct} %`}): ${formatMXN(q.sellBeforeTaxCents)} · IVA ${q.taxRatePct} %: ${formatMXN(q.taxCents)} · Total: ${formatMXN(q.totalCents)}`, 9, true);
   for (const wn of q.warnings) w.text(`• ${wn}`, 8);
