@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_CATALOG, type Project, type ProjectCalculation } from '@ms/domain';
 import { renderModel, type RenderBox, type RenderModel } from '@ms/geometry';
-import { Camera, DoorOpen, RotateCcw } from 'lucide-react';
+import { Camera, DoorOpen, Lightbulb, RotateCcw } from 'lucide-react';
 import type * as THREE_NS from 'three';
 
 type Three = typeof THREE_NS;
@@ -86,7 +86,7 @@ function disposeGroup(g: THREE_NS.Group) {
 }
 
 /** Arma el mueble y el cuarto; abre las puertas girándolas sobre su lado de bisagra. */
-function buildModel(ctx: Ctx, rm: RenderModel, doorsOpen: boolean, fresh: boolean) {
+function buildModel(ctx: Ctx, rm: RenderModel, doorsOpen: boolean, fresh: boolean, ledOn: boolean) {
   const { T, model, room, grain } = ctx;
   disposeGroup(model); disposeGroup(room);
   const mats = new Map<string, THREE_NS.Material>();
@@ -95,7 +95,8 @@ function buildModel(ctx: Ctx, rm: RenderModel, doorsOpen: boolean, fresh: boolea
     let m = mats.get(key);
     if (!m) {
       const color = new T.Color(r.material.color);
-      m = r.material.kind === 'handle' ? new T.MeshStandardMaterial({ color, metalness: 0.9, roughness: 0.28 })
+      m = r.material.kind === 'led' ? new T.MeshStandardMaterial({ color, roughness: 0.3, emissive: new T.Color('#ffc978'), emissiveIntensity: ledOn ? 4 : 0.02 })
+        : r.material.kind === 'handle' ? new T.MeshStandardMaterial({ color, metalness: 0.9, roughness: 0.28 })
         : r.material.kind === 'steel' ? new T.MeshStandardMaterial({ color, metalness: 0.55, roughness: 0.45 })
         : new T.MeshStandardMaterial({ color, roughness: r.material.grain ? 0.62 : 0.5, metalness: 0, map: r.material.grain ? grain : null });
       mats.set(key, m);
@@ -105,12 +106,25 @@ function buildModel(ctx: Ctx, rm: RenderModel, doorsOpen: boolean, fresh: boolea
   const edgeMat = new T.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 });
   // Pivotes de puertas
   const doorPivot = new Map<string, { pivot: THREE_NS.Group; sign: number }>();
+  let ledLights = 0;
   for (const r of rm.boxes) {
     const mesh = new T.Mesh(boxGeometry(T, r), matFor(r));
-    mesh.castShadow = true; mesh.receiveShadow = true;
+    const isLed = r.material.kind === 'led';
+    mesh.castShadow = !isLed; mesh.receiveShadow = !isLed;
+    if (isLed && ledOn && r.lightDir && ledLights < 16) {
+      // Luz de la tira: foco suave hacia donde apunta (coordenadas three: X = x, Y = z, Z = −y).
+      ledLights++;
+      const [dx, dy, dz] = r.lightDir;
+      const c = new T.Vector3(((r.b.x0 + r.b.x1) / 2) * S, ((r.b.z0 + r.b.z1) / 2) * S, -((r.b.y0 + r.b.y1) / 2) * S);
+      const dir = new T.Vector3(dx, dz, -dy);
+      const lenM = Math.max(r.b.x1 - r.b.x0, r.b.z1 - r.b.z0) * S;
+      const spot = new T.SpotLight(0xffd29a, 2.2 + lenM * 2.5, 3, Math.PI * 0.42, 1, 1.6);
+      spot.position.copy(c).addScaledVector(dir, 0.01);
+      spot.target.position.copy(c).addScaledVector(dir, 1);
+      model.add(spot, spot.target);
+    }
     mesh.name = r.key;
-    const edges = new T.LineSegments(new T.EdgesGeometry(mesh.geometry), edgeMat);
-    mesh.add(edges);
+    if (!isLed) mesh.add(new T.LineSegments(new T.EdgesGeometry(mesh.geometry), edgeMat));
     const doorKey = r.key.replace(/-jaladera$/, '');
     const isDoor = DOOR_KEY.test(doorKey);
     if (doorsOpen && isDoor) {
@@ -169,8 +183,10 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
   const [failed, setFailed] = useState(false);
   const [finish, setFinish] = useState<string>('');
   const [doorsOpen, setDoorsOpen] = useState(false);
+  const [ledOn, setLedOn] = useState(false);
   const rm = useMemo(() => renderModel(project, calc, DEFAULT_CATALOG, finish || undefined), [project, calc, finish]);
   const hasDoors = useMemo(() => rm.boxes.some((b) => DOOR_KEY.test(b.key)), [rm]);
+  const hasLed = useMemo(() => rm.boxes.some((b) => b.material.kind === 'led'), [rm]);
   const framedFor = useRef<string>('');
 
   // Inicializa three una sola vez (se carga sólo cuando se abre el render)
@@ -201,7 +217,7 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
         scene.environmentIntensity = 0.75;
         const sun = new T.DirectionalLight(0xfff3e2, 1.7);
         sun.name = 'sun'; sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02; sun.shadow.radius = 4;
-        scene.add(sun, sun.target, new T.HemisphereLight(0xffffff, 0xb9ad9c, 0.35));
+        scene.add(sun, sun.target, Object.assign(new T.HemisphereLight(0xffffff, 0xb9ad9c, 0.35), { name: 'sky' }));
         const camera = new T.PerspectiveCamera(35, 1, 0.01, 60);
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true; controls.maxPolarAngle = Math.PI * 0.52; controls.minDistance = 0.4; controls.maxDistance = 14;
@@ -235,9 +251,15 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
     if (!ready || !ctx) return;
     // Reencuadra sólo cuando cambian las medidas, no al cambiar acabado o abrir puertas
     const sig = JSON.stringify(rm.bounds);
-    buildModel(ctx, rm, doorsOpen, framedFor.current !== sig);
+    buildModel(ctx, rm, doorsOpen, framedFor.current !== sig, ledOn && hasLed);
+    // Escena de noche para que se aprecie la luz LED
+    const night = ledOn && hasLed;
+    ctx.scene.environmentIntensity = night ? 0.22 : 0.75;
+    (ctx.scene.getObjectByName('sun') as THREE_NS.DirectionalLight).intensity = night ? 0.12 : 1.7;
+    (ctx.scene.getObjectByName('sky') as THREE_NS.HemisphereLight).intensity = night ? 0.06 : 0.35;
+    (ctx.scene.background as THREE_NS.Color).set(night ? 0x1b1d22 : 0xe9e6e0);
     framedFor.current = sig;
-  }, [ready, rm, doorsOpen]);
+  }, [ready, rm, doorsOpen, ledOn, hasLed]);
 
   function snapshot() {
     const ctx = ctxRef.current;
@@ -264,6 +286,10 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
           ))}
         </div>
         <span className="flex-1" />
+        {hasLed && (
+          <button type="button" aria-pressed={ledOn} onClick={() => setLedOn(!ledOn)} data-testid="render-led"
+            className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${ledOn ? 'bg-[#ffd84d] text-[#2a2200]' : 'bg-[#253541]'}`}><Lightbulb aria-hidden className="h-4 w-4" />{ledOn ? 'Apagar LED' : 'Encender LED'}</button>
+        )}
         {hasDoors && (
           <button type="button" aria-pressed={doorsOpen} onClick={() => setDoorsOpen(!doorsOpen)} data-testid="render-doors"
             className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${doorsOpen ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><DoorOpen aria-hidden className="h-4 w-4" />{doorsOpen ? 'Cerrar puertas' : 'Abrir puertas'}</button>

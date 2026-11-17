@@ -202,3 +202,43 @@ test('render 3D del mueble', async ({ page }) => {
   await expect(page.getByTestId('model-svg')).toBeVisible();
 });
 
+
+test('LED con router y precio de venta para Monterrey', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('family-kitchen_wall').click();
+  await page.getByText('Iluminación LED').first().click();
+  await page.getByTestId('mod-led').selectOption('under_cabinet');
+  await expect(page.getByTestId('led-legend')).toContainText('Ranura LED');
+  await expect(page.getByTestId('model-svg').locator('line[data-kind="led"]')).toHaveCount(1);
+
+  // Taller: el router aparece como esencial y señala la ranura en el modelo
+  await page.getByTestId('tab-workshop').click();
+  await expect(page.getByTestId('equipment-router')).toBeVisible();
+  await page.getByTestId('equipment-model-router').click();
+  await expect(page.getByTestId('model-sheet').locator('line[data-kind="led"]')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+
+  // Precio de venta
+  await page.getByTestId('tab-price').click();
+  await expect(page.getByTestId('price-tab')).toBeVisible();
+  await expect(page.getByTestId('market-bar')).toBeVisible();
+  await expect(page.getByTestId('tier-saludable')).toContainText('Sin LED');
+  await expect(page.getByRole('radiogroup', { name: 'Nivel de precio' })).toContainText('Recomendado');
+  const estimated = await page.getByTestId('price-recommended').textContent();
+  await page.getByTestId('input-cost').fill('9000');
+  await expect(page.getByTestId('price-recommended')).not.toHaveText(estimated ?? '');
+  await expect(page.getByTestId('price-breakdown')).toContainText('lo que capturaste');
+  await expect(page.getByTestId('price-health')).toContainText('Utilidad neta');
+  await page.getByTestId('tier-premium').click();
+  await expect(page.getByTestId('tier-premium')).toHaveAttribute('aria-checked', 'true');
+  const before = await page.getByTestId('price-recommended').textContent();
+  await page.getByTestId('price-settings').locator('summary').click();
+  await page.getByTestId('market-margin-2').fill('35');
+  await expect(page.getByTestId('price-recommended')).not.toHaveText(before ?? '');
+  await expect(page.getByTestId('price-materials')).toContainText('Referencia MTY');
+  // Se guarda con el proyecto
+  await expect(page.getByTestId('save-state')).toContainText('Guardado', { timeout: 10_000 });
+  await page.reload();
+  await page.getByTestId('tab-price').click();
+  await expect(page.getByTestId('input-cost')).toHaveValue('9000');
+});

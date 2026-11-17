@@ -13,6 +13,8 @@ export interface ModelFocus {
   diagonals: boolean;
   /** Resaltar el bastidor de PTR. */
   steel: boolean;
+  /** Dibujar las ranuras LED (router). */
+  led?: boolean;
   /** Etiqueta corta por pieza (p. ej. «2 cazoletas»). */
   labels: Record<string, string>;
   /** Una línea que explica lo resaltado. */
@@ -61,6 +63,13 @@ export function equipmentFocus(equipmentId: string, calc: ProjectCalculation): M
       );
     case 'plantilla-system32':
       return machiningFocus([{ id: 'shelf-pin-line-32', one: 'barreno de soporte', many: 'barrenos de soporte' }], 'Costados con línea de barrenos para soportes de entrepaño.');
+    case 'router': {
+      const runs = calc.ledRuns;
+      const labels: Record<string, string> = {};
+      for (const r of runs) labels[r.partId] = `ranura ${r.grooveWidthMm}×${r.grooveDepthMm} · ${r.face}`;
+      const partIds = [...new Set(runs.map((r) => r.partId))];
+      return { ...base, partIds, labels, led: true, note: `Líneas amarillas = ranuras para LED (${plural(runs.length, 'tramo', 'tramos')}, ${Math.round(runs.reduce((t, r) => t + r.lengthMm, 0) / 10) / 100} m).`, empty: runs.length === 0 };
+    }
     case 'prensas': case 'atornillador':
       return { ...base, partIds: ids((p) => ROLES.carcass.includes(p.role)), note: 'Caja: costados, tapa, piso, divisores y respaldo que se unen a escuadra.' };
     case 'medidor-diagonales':
@@ -92,6 +101,8 @@ export function equipmentFocus(equipmentId: string, calc: ProjectCalculation): M
 export function stationFocus(stationId: StationId, equipmentIds: string[], calc: ProjectCalculation): ModelFocus {
   const focuses = equipmentIds.map((id) => equipmentFocus(id, calc)).filter((f) => !f.empty);
   if (!focuses.length) return { partIds: [], edges: false, diagonals: false, steel: false, labels: {}, note: 'Sin piezas específicas en esta estación.', empty: true };
+  // La ranura LED es lo más visual del mecanizado: si hay, su nota manda.
+  const ledFocus = focuses.find((f) => f.led);
   const main = EQUIPMENT.find((e) => e.station === stationId && equipmentIds.includes(e.id));
   const primary = (main && focuses[equipmentIds.indexOf(main.id)]) || focuses[0]!;
   return {
@@ -99,8 +110,9 @@ export function stationFocus(stationId: StationId, equipmentIds: string[], calc:
     edges: focuses.some((f) => f.edges),
     diagonals: focuses.some((f) => f.diagonals),
     steel: focuses.some((f) => f.steel),
+    led: focuses.some((f) => f.led),
     labels: Object.assign({}, ...focuses.map((f) => f.labels)),
-    note: primary.note,
+    note: ledFocus ? `${primary.note} ${ledFocus.note}` : primary.note,
     empty: false,
   };
 }

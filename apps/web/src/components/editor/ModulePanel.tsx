@@ -1,5 +1,5 @@
 'use client';
-import { CATEGORY_LABELS, DEFAULT_CATALOG, FAMILIES, catalogLookup, createModule, type ModuleResult, type ModuleSpec } from '@ms/domain';
+import { CATEGORY_LABELS, DEFAULT_CATALOG, FAMILIES, catalogLookup, createModule, type LedPlacement, type ModuleResult, type ModuleSpec } from '@ms/domain';
 import { Badge, Button, More } from '../ui';
 import { NumberInput, SelectInput, TextInput } from './inputs';
 
@@ -50,12 +50,22 @@ export function ModuleList({ modules, results, selected, onSelect, onAdd, onRemo
   );
 }
 
+const LED_PLACES: { value: LedPlacement; label: string }[] = [
+  { value: 'none', label: 'Sin LED' },
+  { value: 'under_cabinet', label: 'Bajo el mueble (ilumina la cubierta)' },
+  { value: 'shelves', label: 'Bajo cada entrepaño' },
+  { value: 'sides', label: 'Vertical en costados' },
+  { value: 'top_inside', label: 'Bajo la tapa (interior)' },
+];
+
 export function ModuleForm({ m, onChange }: { m: ModuleSpec; onChange: (m: ModuleSpec) => void }) {
   const set = <K extends keyof ModuleSpec>(k: K, v: ModuleSpec[K]) => onChange({ ...m, [k]: v });
   const fam = L.family(m.familyId);
   const isDesk = fam.geometryStrategy === 'desk';
   const hinges = DEFAULT_CATALOG.hardware.filter((h) => h.category === 'hinge');
   const slides = DEFAULT_CATALOG.hardware.filter((h) => h.category === 'drawer_slide');
+  const ledStrips = DEFAULT_CATALOG.hardware.filter((h) => h.category === 'led_strip');
+  const ledProfiles = DEFAULT_CATALOG.hardware.filter((h) => h.category === 'led_profile');
   const steelOn = isDesk ? m.steel.enabled : m.baseType === 'steel_frame';
   return (
     <div className="grid gap-3" aria-label={`Configuración de ${m.id}`}>
@@ -82,6 +92,18 @@ hint={fam.status === 'verified_vertical' ? '✓ Verificada' : fam.status === 'co
         {!isDesk && m.baseType !== 'none' && <NumberInput label="Altura de base" suffix="mm" value={m.baseHeightMm} min={0} max={400} onChange={(v) => set('baseHeightMm', v)} />}
         {isDesk && <SelectInput label="Estructura" value={m.steel.enabled ? 'steel' : 'panel'} onChange={(v) => set('steel', { ...m.steel, enabled: v === 'steel' })} options={[{ value: 'panel', label: 'Costados tipo panel' }, { value: 'steel', label: 'Bastidor de PTR' }]} testId="mod-desk-structure" />}
       </div>
+      <More summary={m.led.placement === 'none' ? 'Iluminación LED' : `Iluminación LED · ${LED_PLACES.find((x) => x.value === m.led.placement)?.label ?? ''}`}>
+        <div className="grid grid-cols-2 gap-2">
+          <SelectInput label="Tira LED" value={m.led.placement} onChange={(v) => set('led', { ...m.led, placement: v })} options={LED_PLACES} testId="mod-led"
+            hint={m.led.placement === 'none' ? undefined : 'Va empotrada: se fresa una ranura con router'} />
+          {m.led.placement !== 'none' && <>
+            <SelectInput label="Sensor / encendido" value={m.led.sensor} onChange={(v) => set('led', { ...m.led, sensor: v })} testId="mod-led-sensor"
+              options={[{ value: 'none', label: 'Desde la fuente / apagador' }, { value: 'door', label: 'Al abrir la puerta' }, { value: 'hand', label: 'Sensor de mano' }, { value: 'touch', label: 'Táctil con atenuador' }]} />
+            <SelectInput label="Tipo de tira" value={m.led.stripProductId} onChange={(v) => set('led', { ...m.led, stripProductId: v })} options={ledStrips.map((h) => ({ value: h.id, label: h.name }))} />
+            <SelectInput label="Perfil (ranura)" value={m.led.profileProductId} onChange={(v) => set('led', { ...m.led, profileProductId: v })} options={ledProfiles.map((h) => ({ value: h.id, label: h.name }))} />
+          </>}
+        </div>
+      </More>
       <More summary="Cantos y respaldo">
         <div className="grid grid-cols-2 gap-2">
         <NumberInput label="Espesor real" suffix="mm" value={m.thicknessMm} min={3} max={60} step={0.1} onChange={(v) => set('thicknessMm', v)} hint="Medir el tablero real" testId="mod-thickness" />

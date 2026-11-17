@@ -5,6 +5,7 @@ import {
   type ProjectCalculation, type ReleaseStatus,
 } from '../types';
 import { r2 } from './helpers';
+import { ledDrivers } from './led';
 import { calculateModule } from './module';
 
 /** Calcula el proyecto completo. Determinista: misma entrada => misma salida (sin fechas ni azar). */
@@ -21,7 +22,7 @@ export function calculateProject(project: Project, catalog: Catalog): ProjectCal
       res = {
         moduleId: spec.id, offsetXMm: x, offsetYMm: 0, fabricable: false, parts: [], hardware: [], machining: [], steel: [],
         issues: [{ code: 'MODULE_CALC_FAILED', severity: 'error', moduleId: spec.id, message: `No se pudo calcular ${spec.label}: ${(e as Error).message}` }],
-        theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, checks: [], weightKg: 0,
+        theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, checks: [], weightKg: 0, ledRuns: [],
       };
     }
     res.offsetYMm = r2(maxDepth - spec.depthMm);
@@ -41,6 +42,7 @@ export function calculateProject(project: Project, catalog: Catalog): ProjectCal
 
   const parts = modules.flatMap((m) => m.parts);
   const hardware = aggregateHardware(modules.flatMap((m) => m.hardware));
+  hardware.push(...ledDrivers(hardware, catalogLookup(catalog)));
   const allIssues = [...modules.flatMap((m) => m.issues), ...issues];
   const edgeBands = edgeBandTotals(parts, catalog, project.pricing.edgeAllowancePerSegmentMm, project.pricing.edgeWastePct);
   const machining = modules.flatMap((m) => m.machining);
@@ -55,6 +57,7 @@ export function calculateProject(project: Project, catalog: Catalog): ProjectCal
     steel: modules.flatMap((m) => m.steel),
     edgeBands,
     issues: allIssues,
+    ledRuns: modules.flatMap((m) => m.ledRuns),
     releaseStatus: releaseStatus(project, allIssues, machining.some((o) => o.validationStatus !== 'verified')),
     totals: {
       panelCount: parts.reduce((n, p) => n + p.quantity, 0),

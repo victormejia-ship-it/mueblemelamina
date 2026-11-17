@@ -30,6 +30,7 @@ export function ModelSheet({ target, project, calc, onClose }: { target: ModelTa
         <div className="mb-2 flex flex-wrap gap-1.5 text-[11.5px] font-semibold">
           <span className="flex items-center gap-1 rounded-full bg-[#1d3140] px-2 py-0.5"><span className="h-2.5 w-2.5 rounded-sm border-2 border-[#5fd4ef]" />Dónde se usa</span>
           {f.edges && <span className="flex items-center gap-1 rounded-full bg-[#1d3140] px-2 py-0.5"><span className="h-[3px] w-4 rounded bg-[#ff9f43]" />Canto</span>}
+          {f.led && <span className="flex items-center gap-1 rounded-full bg-[#1d3140] px-2 py-0.5"><span className="h-[3px] w-4 rounded bg-[#ffd84d]" />Ranura LED</span>}
           {f.diagonals && <span className="flex items-center gap-1 rounded-full bg-[#1d3140] px-2 py-0.5"><span className="w-4 border-t-2 border-dashed border-[#5fd4ef]" />Diagonales</span>}
         </div>
         <Viewer project={project} calc={calc} selected={selected} onSelect={setSelected} focus={f} />

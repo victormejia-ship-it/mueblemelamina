@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { Catalog } from '../catalog';
 import { SCHEMA_VERSION, type Project, type SupplierOffer } from '../types';
 import { DEFAULT_MANUFACTURING, createModule, defaultPricing } from './factory';
+import { defaultMarket } from '../pricing/market';
 
 const mm = z.number().finite();
 const posMm = z.number().finite().positive();
@@ -43,6 +44,13 @@ export const ModuleSpecSchema = z.object({
   }),
   revealMm: mm.min(0).max(20),
   frontGapMm: mm.min(0).max(20),
+  // Campo agregado después de 1.0.0: los proyectos guardados sin él no llevan LED.
+  led: z.object({
+    placement: z.enum(['none', 'under_cabinet', 'shelves', 'sides', 'top_inside']),
+    stripProductId: z.string(),
+    profileProductId: z.string(),
+    sensor: z.enum(['none', 'door', 'hand', 'touch']),
+  }).default({ placement: 'none', stripProductId: 'led-strip-cob-12v', profileProductId: 'led-profile-embed-17', sensor: 'none' }),
 });
 
 export const PricingSchema = z.object({
@@ -58,6 +66,23 @@ export const PricingSchema = z.object({
   manualCosts: z.array(z.object({
     key: z.string(), label: z.string(), applies: z.boolean(), amountCents: cents.nullable(), taxIncluded: z.boolean(), notes: z.string().optional(),
   })),
+  // Campo agregado después de 1.0.0: los proyectos guardados sin él usan los valores de Monterrey por defecto.
+  market: z.object({
+    inputCostCents: cents.max(10_000_000_000).nullable().default(null),
+    inputCostIncludesTax: z.boolean().default(false),
+    salesCostPct: z.number().min(0).max(50).default(5),
+    paymentFeePct: z.number().min(0).max(20).default(2),
+    laborDayCents: cents.max(10_000_000),
+    helperDayCents: cents.max(10_000_000),
+    overheadPct: z.number().min(0).max(200),
+    consumablesPct: z.number().min(0).max(100),
+    contingencyPct: z.number().min(0).max(100),
+    transportTripCents: cents.max(100_000_000),
+    trips: z.number().int().min(0).max(100).nullable(),
+    includeInstallation: z.boolean(),
+    netMarginsPct: z.tuple([z.number().min(0).max(60), z.number().min(0).max(60), z.number().min(0).max(60)]),
+    priceOverrides: z.record(z.string(), cents),
+  }).default(defaultMarket),
 });
 
 export const ProjectSchema = z.object({

@@ -57,6 +57,7 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
             </polygon>
           ))}
           {scene.lines.map((l, i) => l.kind === 'edge' ? <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ff9f43" strokeWidth={3} strokeLinecap="round" data-kind="edge" />
+            : l.kind === 'led' ? <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ffd84d" strokeWidth={3.5} strokeLinecap="round" data-kind="led" />
             : l.kind === 'diag' ? <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#5fd4ef" strokeWidth={2} strokeDasharray="8 5" data-kind="diag" />
             : <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ffbe66" strokeWidth={1.3} markerStart="url(#arrow)" markerEnd="url(#arrow)" />)}
           {scene.labels.map((t, i) => (
@@ -68,7 +69,7 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
         </svg>
       </div>
       </>}
-      {view !== 'render' && <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {selected}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un plano CNC. Para ver cómo se vería, usa «Render».</Hint></div>}
+      {view !== 'render' && <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {selected}</span>}{calc.ledRuns.length > 0 && <span className="flex items-center gap-1 rounded-full bg-[#2b3a24] px-2 py-0.5 font-semibold text-[#ffe27a]" data-testid="led-legend"><span className="h-[3px] w-4 rounded bg-[#ffd84d]" />Ranura LED (router) · {calc.ledRuns.length}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un plano CNC. Para ver cómo se vería, usa «Render».</Hint></div>}
     </div>
   );
 }

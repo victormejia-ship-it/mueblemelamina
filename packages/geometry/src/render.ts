@@ -1,8 +1,8 @@
 import { DEFAULT_CATALOG, type Box3, type Catalog, type Project, type ProjectCalculation } from '@ms/domain';
 
 /** Material de una caja del render: color base y, si tiene veta, su dirección en el mundo. */
-export interface RenderMaterial { color: string; grain: boolean; kind: 'board' | 'back' | 'drawer' | 'steel' | 'handle' }
-export interface RenderBox { key: string; partId: string; role: string; b: Box3; material: RenderMaterial; grainDir: 'x' | 'y' | 'z' | null }
+export interface RenderMaterial { color: string; grain: boolean; kind: 'board' | 'back' | 'drawer' | 'steel' | 'handle' | 'led' }
+export interface RenderBox { key: string; partId: string; role: string; b: Box3; material: RenderMaterial; grainDir: 'x' | 'y' | 'z' | null; /** Tiras LED: hacia dónde ilumina (ejes del mueble). */ lightDir?: [number, number, number] }
 export interface RenderModel { boxes: RenderBox[]; bounds: Box3; wallMounted: boolean }
 
 const HANDLE_LEN = 128, HANDLE_T = 12, HANDLE_OUT = 28;
@@ -55,6 +55,21 @@ export function renderModel(project: Project, calc: ProjectCalculation, catalog:
         boxes.push({ key: `${p.id}#${i + 1}-jaladera`, partId: p.id, role: 'handle', b: move(hb), material: handle, grainDir: null });
       });
     }
+  }
+  // Tiras LED: difusor al ras de la cara fresada
+  for (const r of calc.ledRuns) {
+    const m = calc.modules.find((x) => x.moduleId === r.moduleId);
+    const spec = project.modules.find((s) => s.id === r.moduleId);
+    if (!m) continue;
+    const lift = spec?.mount === 'wall' ? WALL_UNIT_BOTTOM_MM : 0;
+    const hw = r.grooveWidthMm / 2 - 1.5;
+    const ox = m.offsetXMm, oy = m.offsetYMm;
+    const vertical = r.a[2] !== r.b[2];
+    const t = 0.8 * Math.sign(r.lightDir[0] || r.lightDir[2] || 1);
+    const b: Box3 = vertical
+      ? { x0: Math.min(r.a[0], r.a[0] + t) + ox, x1: Math.max(r.a[0], r.a[0] + t) + ox, y0: r.a[1] - hw + oy, y1: r.a[1] + hw + oy, z0: r.a[2] + lift, z1: r.b[2] + lift }
+      : { x0: r.a[0] + ox, x1: r.b[0] + ox, y0: r.a[1] - hw + oy, y1: r.a[1] + hw + oy, z0: r.a[2] - 0.8 + lift, z1: r.a[2] + lift };
+    boxes.push({ key: r.id, partId: r.partId, role: 'led', b, material: { color: '#ffe2a8', grain: false, kind: 'led' }, grainDir: null, lightDir: r.lightDir });
   }
   // Herrería: patas y largueros esquemáticos
   for (const m of calc.modules) {

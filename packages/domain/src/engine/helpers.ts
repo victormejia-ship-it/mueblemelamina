@@ -147,7 +147,7 @@ export class ModuleBuilder {
     }
   }
 
-  private pushOp(op: Omit<MachiningOperation, 'id'>, part: PanelPart) {
+  pushOp(op: Omit<MachiningOperation, 'id'>, part: PanelPart) {
     const id = `${part.id}-M${String(part.machiningOperationIds.length + 1).padStart(3, '0')}`;
     this.machining.push({ ...op, id });
     part.machiningOperationIds.push(id);
