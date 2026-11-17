@@ -24,6 +24,12 @@ export const FAMILIES: FamilyDefinition[] = [
     pendingRules: ['La cubierta (granito/cuarzo/laminado) no forma parte del despiece de tablero.'],
   },
   {
+    id: 'kitchen_base_drawer', name: 'Bajo de cocina con cajón', category: 'kitchen', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Gabinete bajo con un cajón pequeño arriba, travesaño fijo y puertas abajo.',
+    defaults: d({ shelfLoadKgM2: 30, widthMm: 800, heightMm: 720, depthMm: 580, front: 'drawer_doors', drawerCount: 1, baseType: 'levelers', baseHeightMm: 100 }),
+    pendingRules: ['La cubierta no forma parte del despiece de tablero.'],
+  },
+  {
     id: 'kitchen_wall', name: 'Gabinete aéreo', category: 'kitchen', geometryStrategy: 'box', status: 'configurable_base_template',
     description: 'Caja colgada a muro. Requiere sistema de colgado y cálculo de anclaje.',
     defaults: d({ shelfLoadKgM2: 30, widthMm: 800, heightMm: 700, depthMm: 350, mount: 'wall' }),
@@ -55,8 +61,8 @@ export const FAMILIES: FamilyDefinition[] = [
   },
   {
     id: 'dresser', name: 'Cómoda', category: 'bedroom', geometryStrategy: 'box', status: 'configurable_base_template',
-    description: 'Caja con frentes de cajón. Las cajas de cajón se calculan sólo con corredera seleccionada.',
-    defaults: d({ widthMm: 900, heightMm: 900, depthMm: 500, front: 'drawers', drawerCount: 4, shelvesPerBay: 0, baseType: 'plinth', baseHeightMm: 60 }),
+    description: 'Caja con frentes de cajón graduados (más chicos arriba). Sin corredera elegida se usa la genérica para calcular las cajas.',
+    defaults: d({ widthMm: 900, heightMm: 900, depthMm: 500, front: 'drawers', drawerCount: 4, drawerLayout: 'graduated', shelvesPerBay: 0, baseType: 'plinth', baseHeightMm: 60 }),
     pendingRules: ['Anclaje antivuelco recomendado para cómodas; validar con fabricante del herraje.'],
   },
   {
@@ -64,6 +70,12 @@ export const FAMILIES: FamilyDefinition[] = [
     description: 'Caja pequeña con 1–3 cajones.',
     defaults: d({ widthMm: 500, heightMm: 550, depthMm: 400, front: 'drawers', drawerCount: 2, shelvesPerBay: 0, baseType: 'plinth', baseHeightMm: 60 }),
     pendingRules: [],
+  },
+  {
+    id: 'floating_drawer', name: 'Cajón flotante', category: 'bedroom', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Cajón colgado a muro sin patas (buró flotante, repisa con cajón, recibidor). Requiere anclaje según el muro.',
+    defaults: d({ widthMm: 600, heightMm: 180, depthMm: 350, front: 'drawers', drawerCount: 1, shelvesPerBay: 0, mount: 'wall', shelfLoadKgM2: 20 }),
+    pendingRules: ['Colgadores o riel oculto según el muro; validar carga con el cajón lleno.'],
   },
   {
     id: 'desk', name: 'Escritorio', category: 'office', geometryStrategy: 'desk', status: 'verified_vertical',

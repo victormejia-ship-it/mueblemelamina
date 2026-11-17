@@ -8,6 +8,10 @@ export interface RenderModel { boxes: RenderBox[]; bounds: Box3; wallMounted: bo
 const HANDLE_LEN = 128, HANDLE_T = 12, HANDLE_OUT = 28;
 /** Altura de referencia del fondo de un gabinete aéreo (cubierta ≈ 900 mm + ≈ 550 mm de salpicadero). */
 export const WALL_UNIT_BOTTOM_MM = 1450;
+/** Otros muebles a muro (cajón o buró flotante, repisas): fondo a esta altura de referencia. */
+export const FLOATING_BOTTOM_MM = 450;
+const liftFor = (spec: { mount: string; familyId: string } | undefined) =>
+  spec?.mount !== 'wall' ? 0 : spec.familyId.startsWith('kitchen') || spec.familyId === 'pantry' ? WALL_UNIT_BOTTOM_MM : FLOATING_BOTTOM_MM;
 
 /**
  * Datos para el render 3D (coordenadas en mm: x ancho, y fondo con el frente en y=0, z alto).
@@ -22,7 +26,7 @@ export function renderModel(project: Project, calc: ProjectCalculation, catalog:
     if (spec?.mount === 'wall') wallMounted = true;
     const all = m.parts.flatMap((p) => p.placements);
     const midX = all.length ? (Math.min(...all.map((b) => b.x0)) + Math.max(...all.map((b) => b.x1))) / 2 : 0;
-    const lift = spec?.mount === 'wall' ? WALL_UNIT_BOTTOM_MM : 0;
+    const lift = liftFor(spec);
     const move = (b: Box3): Box3 => ({ x0: b.x0 + m.offsetXMm, x1: b.x1 + m.offsetXMm, y0: b.y0 + m.offsetYMm, y1: b.y1 + m.offsetYMm, z0: b.z0 + lift, z1: b.z1 + lift });
     for (const p of m.parts) {
       const fin = finishes.get(finishOverride ?? p.finishId) ?? catalog.finishes[0]!;
@@ -61,7 +65,7 @@ export function renderModel(project: Project, calc: ProjectCalculation, catalog:
     const m = calc.modules.find((x) => x.moduleId === r.moduleId);
     const spec = project.modules.find((s) => s.id === r.moduleId);
     if (!m) continue;
-    const lift = spec?.mount === 'wall' ? WALL_UNIT_BOTTOM_MM : 0;
+    const lift = liftFor(spec);
     const hw = r.grooveWidthMm / 2 - 1.5;
     const ox = m.offsetXMm, oy = m.offsetYMm;
     const vertical = r.a[2] !== r.b[2];

@@ -61,7 +61,7 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await page.getByTestId('mod-drawers').fill('3');
   await page.getByTestId('tab-parts').click();
   await expect(page.getByTestId('parts-table')).toContainText('M01-DRAWER_FRONT');
-  await expect(page.getByTestId('parts-table')).not.toContainText('M01-DRAWER_SIDE');
+  await expect(page.getByTestId('parts-table')).toContainText('M01-DRAWER_SIDE'); // con corredera genérica por defecto
   await page.getByTestId('mod-slide').selectOption('slide-generic-telescopic');
   await expect(page.getByTestId('parts-table')).toContainText('M01-DRAWER_SIDE');
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-DRAWER_SIDE' })).toContainText('Pendiente validación');
@@ -147,14 +147,14 @@ test('página general del taller', async ({ page }) => {
 test('portada: catálogo con búsqueda, categorías y proyectos recientes', async ({ page }) => {
   await page.goto('/');
   const grid = page.getByTestId('catalog-grid');
-  await expect(grid.locator('li')).toHaveCount(19);
+  await expect(grid.locator('li')).toHaveCount(21);
   await expect(grid.locator('svg').first()).toBeVisible();
   await page.getByTestId('catalog-search').fill('closet');
   await expect(grid.locator('li')).toHaveCount(1);
   await expect(grid).toContainText('Clóset');
   await page.getByTestId('catalog-search').fill('');
   await page.getByTestId('cat-kitchen').click();
-  await expect(grid.locator('li')).toHaveCount(4);
+  await expect(grid.locator('li')).toHaveCount(5);
   await page.getByTestId('cat-all').click();
   await page.getByTestId('family-desk').click();
   await page.waitForURL(/\/editor\/?\?id=/);
@@ -241,4 +241,22 @@ test('LED con router y precio de venta para Monterrey', async ({ page }) => {
   await page.reload();
   await page.getByTestId('tab-price').click();
   await expect(page.getByTestId('input-cost')).toHaveValue('9000');
+});
+
+test('cajones: cajas calculadas, cajón + puertas y etiquetas sin encimarse', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('family-dresser').click();
+  await expect(page.getByTestId('mod-drawer-layout')).toHaveValue('graduated');
+  // Las cajas de cajón salen aunque no se elija corredera
+  await page.getByTestId('tab-parts').click();
+  await expect(page.locator('#panel-parts')).toContainText('DRAWER_SIDE');
+  await page.getByTestId('tab-model').click();
+  await page.getByRole('button', { name: 'IDs' }).click();
+  await expect(page.getByTestId('model-svg').locator('text', { hasText: 'DRAWER_FRONT' }).first()).toBeVisible();
+  await expect(page.getByTestId('model-svg').locator('text', { hasText: 'DRAWER_SIDE' })).toHaveCount(0);
+  // Cajón arriba + puertas
+  await page.getByTestId('mod-front').selectOption('drawer_doors');
+  await expect(page.getByTestId('mod-top-drawers')).toBeVisible();
+  await expect(page.getByTestId('model-svg').locator('text', { hasText: 'DOOR' }).first()).toBeVisible();
+  await expect(page.getByTestId('checks-summary')).not.toContainText('error');
 });

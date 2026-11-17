@@ -22,9 +22,11 @@ export const ModuleSpecSchema = z.object({
   edgeBandId: z.string().min(1),
   edgePolicy: z.enum(['front_visible_only', 'all_visible', 'none']),
   construction: z.enum(['top_bottom_between_sides', 'sides_between_top_bottom']),
-  front: z.enum(['open', 'doors', 'drawers']),
+  front: z.enum(['open', 'doors', 'drawers', 'drawer_doors']),
   doorCount: z.number().int().min(1).max(8).nullable(),
   drawerCount: z.number().int().min(0).max(10),
+  // Campo agregado después de 1.0.0.
+  drawerLayout: z.enum(['equal', 'graduated']).default('equal'),
   shelvesPerBay: z.number().int().min(0).max(12),
   dividerCount: z.number().int().min(0).max(10).nullable(),
   baseType: z.enum(['none', 'plinth', 'levelers', 'steel_frame']),

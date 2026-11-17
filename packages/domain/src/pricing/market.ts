@@ -85,8 +85,8 @@ export const MARKET_RANGES_MTY: Record<string, { label: string; lowCents: Cents;
 };
 
 const FAMILY_RANGE: Record<string, keyof typeof MARKET_RANGES_MTY> = {
-  kitchen_base: 'base', kitchen_wall: 'aereo', pantry: 'alacena', kitchen_island: 'base', wardrobe: 'closet', walkin: 'vestidor',
-  dresser: 'cajonera', nightstand: 'buro', desk: 'escritorio', credenza: 'base', filing_cabinet: 'cajonera', tv_console: 'tv',
+  kitchen_base: 'base', kitchen_base_drawer: 'base', kitchen_wall: 'aereo', pantry: 'alacena', kitchen_island: 'base', wardrobe: 'closet', walkin: 'vestidor',
+  dresser: 'cajonera', nightstand: 'buro', floating_drawer: 'buro', desk: 'escritorio', credenza: 'base', filing_cabinet: 'cajonera', tv_console: 'tv',
   bookcase: 'librero', bath_vanity: 'bano', laundry: 'base', shoe_cabinet: 'librero', display: 'librero', counter: 'base', custom: 'base',
 };
 
@@ -279,7 +279,7 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
   const ledRuns = calc.ledRuns.length;
   const ledM = calc.ledRuns.reduce((s, r) => s + r.lengthMm, 0) / 1000;
   const doors = calc.parts.filter((p) => p.role === 'front' && p.code.startsWith('DOOR')).reduce((s, p) => s + p.quantity, 0);
-  const drawers = calc.parts.filter((p) => p.code === 'DRAWER_FRONT').reduce((s, p) => s + p.quantity, 0);
+  const drawers = calc.parts.filter((p) => p.code.startsWith('DRAWER_FRONT')).reduce((s, p) => s + p.quantity, 0);
   const modules = project.modules.length;
   const wallOrTall = project.modules.filter((m) => m.mount === 'wall' || m.heightMm > 1500).length;
   const steelFrames = calc.steel.length;

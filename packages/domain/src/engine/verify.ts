@@ -178,11 +178,14 @@ export function verifyModule(v: VerifyInput): VerifyResult {
         add('frentes', 'Juntas de hojas centradas sobre divisores', 'desfase 0 mm', Number.isFinite(worst) ? `${worst} mm` : 'sin junta', ok ? 'ok' : 'warning', doorParts[0]!.id);
       }
     }
-    const drawerFronts = parts.find((p) => p.code === 'DRAWER_FRONT');
-    if (drawerFronts) {
+    const drawerFronts = parts.filter((p) => p.code.startsWith('DRAWER_FRONT'));
+    if (drawerFronts.length) {
       const totalH = spec.heightMm - 2 * spec.revealMm;
-      const sum = r2(drawerFronts.quantity * drawerFronts.widthMm + (drawerFronts.quantity - 1) * spec.frontGapMm);
-      add('frentes', 'Frentes de cajón + juntas = alto cubierto', `${r2(totalH)} mm`, `${sum} mm`, Math.abs(sum - totalH) <= EPS ? 'ok' : 'error');
+      // En «cajón + puertas» la puerta completa la columna de frentes.
+      const doorH = spec.front === 'drawer_doors' ? (doorParts[0]?.lengthMm ?? 0) : 0;
+      const count = drawerFronts.reduce((a, p) => a + p.quantity, 0) + (doorH ? 1 : 0);
+      const sum = r2(drawerFronts.reduce((a, p) => a + p.quantity * p.widthMm, 0) + doorH + (count - 1) * spec.frontGapMm);
+      add('frentes', doorH ? 'Cajones + puerta + juntas = alto cubierto' : 'Frentes de cajón + juntas = alto cubierto', `${r2(totalH)} mm`, `${sum} mm`, Math.abs(sum - totalH) <= EPS ? 'ok' : 'error');
     }
   }
 

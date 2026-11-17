@@ -26,12 +26,12 @@ export function assemblySteps(spec: ModuleSpec, calc: ProjectCalculation): Assem
   add('S07', 'Medir diagonales y fijar respaldo', `Medir ambas diagonales (teórica ${mod?.theoreticalDiagonalMm ?? '—'} mm), corregir y fijar ${has('BACK') ? 'el respaldo sobrepuesto' : 'refuerzos de escuadra (sin respaldo)'}.`, [has('DIVIDER') ? 'S06' : 'S05']);
   if (has('PLINTH_RAIL') || mod?.steel.length || spec.baseType === 'levelers') add('S08', 'Base', spec.baseType === 'levelers' ? 'Instalar patas niveladoras.' : spec.baseType === 'plinth' ? 'Armar bastidor de zoclo y fijarlo a la caja.' : 'Montar bastidor metálico (validación estructural requerida).', ['S07'], spec.baseType === 'steel_frame');
   if (has('SHELF')) add('S09', 'Entrepaños / tubo', 'Colocar soportes y entrepaños; instalar tubo de colgar si aplica.', ['S07']);
-  if (spec.front === 'drawers') {
+  if (spec.front === 'drawers' || spec.front === 'drawer_doors') {
     if (has('DRAWER_SIDE')) add('S10', 'Armar cajas de cajón', 'Armar cajas a escuadra según corredera seleccionada.', ['S04'], true);
     else add('S10', 'PENDIENTE: caja de cajón', 'Seleccionar corredera con ficha y calcular la caja de cajón antes de fabricar.', ['S04'], true);
     add('S11', 'Instalar correderas y frentes', 'Montar correderas según ficha; presentar y regular frentes.', ['S07', 'S10'], true);
   }
-  if (spec.front === 'doors') add('S11', 'Instalar puertas', 'Bisagras exactas según ficha (cargas, solapes, despejes); regular holguras.', ['S07'], true);
+  if (spec.front === 'doors' || spec.front === 'drawer_doors') add(spec.front === 'drawer_doors' ? 'S11B' : 'S11', 'Instalar puertas', 'Bisagras exactas según ficha (cargas, solapes, despejes); regular holguras.', ['S07'], true);
   if (spec.mount === 'wall' || calc.hardware.some((h) => h.moduleId === spec.id && h.category === 'wall_anchor')) add('S12', 'Anclar a muro', 'Instalar colgadores/antivuelco según tipo de muro; validar carga.', ['S07'], true);
   add('S13', 'Inspección y liberación', 'Liberar sólo después de inspección dimensional, de seguridad, funcionamiento y acabado.', s.map((x) => x.id).slice(-1));
   return s;

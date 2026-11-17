@@ -89,11 +89,12 @@ describe('motor de caja', () => {
     }
   });
 
-  it('cajones sin corredera: no se calcula caja y queda bloqueado para validación', () => {
+  it('cajones sin corredera elegida: se calculan las cajas con la genérica y se avisa', () => {
     const res = calculateModule(boxSpec({ front: 'drawers', drawerCount: 3 }), cat);
     expect(res.parts.find((p) => p.code === 'DRAWER_FRONT')!.quantity).toBe(3);
-    expect(res.parts.find((p) => p.code === 'DRAWER_SIDE')).toBeUndefined();
-    expect(res.issues.some((i) => i.code === 'DRAWER_SLIDE_NOT_SELECTED' && i.severity === 'blocker')).toBe(true);
+    expect(res.parts.find((p) => p.code === 'DRAWER_SIDE')!.quantity).toBe(6);
+    expect(res.parts.find((p) => p.code === 'DRAWER_BOTTOM')!.quantity).toBe(3);
+    expect(res.issues.some((i) => i.code === 'DRAWER_SLIDE_GENERIC' && i.severity === 'warning')).toBe(true);
     expect(res.hardware.find((h) => h.category === 'drawer_slide')!.quantity).toBe(3);
   });
 
