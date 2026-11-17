@@ -1,7 +1,7 @@
 'use client';
-import { useMemo, useState } from 'react';
-import { DEFAULT_CATALOG, DEFAULT_MARKET, MARKET_REFERENCE_DATE, MARKET_REGION, marketEstimate, type ManufacturingPlan, type MarketSettings, type PriceTier, type PricingSettings, type Project } from '@ms/domain';
-import { BadgeDollarSign, Check, ClipboardCopy, Lightbulb, Ruler, TrendingUp, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { DEFAULT_CATALOG, MARKET_REFERENCE_DATE, MARKET_REGION, defaultMarket, marketEstimate, type ManufacturingPlan, type MarketSettings, type PriceTier, type PricingSettings, type Project } from '@ms/domain';
+import { BadgeDollarSign, Check, CircleCheck, ClipboardCopy, Lightbulb, Package, TrendingUp, TriangleAlert, Wallet } from 'lucide-react';
 import { Badge, BigStat, Button, Hint, More, type Tone } from '../ui';
 import { NumberInput } from './inputs';
 
@@ -18,20 +18,71 @@ const SOURCE: Record<string, { tone: Tone; label: string }> = {
   referencia: { tone: 'warn', label: 'Referencia MTY' },
   sin_precio: { tone: 'err', label: 'Sin precio' },
 };
-const COST_COLORS = ['#4fb3c9', '#7fc8a9', '#e0b45a', '#b38ad6', '#8a9bab', '#d9826b'];
 
-/** Costeo completo y precio de venta sugerido para Monterrey. */
+/** Captura del costo de insumos: el único dato que se pide para llegar al precio. */
+function InputCost({ settings, estimatedCents, onChange, disabled }: { settings: MarketSettings; estimatedCents: number; onChange: (p: Partial<MarketSettings>) => void; disabled?: boolean }) {
+  const [text, setText] = useState(settings.inputCostCents === null ? '' : String(settings.inputCostCents / 100));
+  useEffect(() => {
+    setText((t) => {
+      const cur = t.trim() === '' ? null : Math.round(Number(t.replace(/[$,\s]/g, '')) * 100);
+      return cur === settings.inputCostCents ? t : settings.inputCostCents === null ? '' : String(settings.inputCostCents / 100);
+    });
+  }, [settings.inputCostCents]);
+  return (
+    <section className="rounded-2xl border border-[#3c6074] bg-[#13283a] p-3.5" aria-labelledby="input-cost-title">
+      <div className="flex flex-wrap items-center gap-2">
+        <Package aria-hidden className="h-5 w-5 text-[#5fd4ef]" />
+        <h2 id="input-cost-title" className="text-[15px] font-bold">Costo de tus insumos</h2>
+        <Hint label="¿Qué incluir?">Todo lo que compras para este mueble: tableros, canto, herrajes, jaladeras, LED, tornillería. Lo demás (mano de obra, renta, luz, herramienta, flete, comisiones, imprevistos y utilidad) lo calcula la app.</Hint>
+      </div>
+      <div className="mt-2 flex flex-wrap items-end gap-3">
+        <label className="grid gap-1 text-[12px] font-semibold text-[#aebdcc]">
+          Total en pesos
+          <span className="flex items-center gap-1 rounded-xl border border-[#4b6a7d] bg-[#0d1b26] px-3 focus-within:border-accent">
+            <span className="text-[20px] font-bold text-muted">$</span>
+            <input data-testid="input-cost" inputMode="decimal" placeholder={String(Math.round(estimatedCents / 100))} disabled={disabled}
+              className="!w-40 !border-0 !bg-transparent !px-0 !py-2 text-[22px] font-extrabold !outline-none"
+              value={text}
+              onChange={(ev) => {
+                setText(ev.target.value);
+                const raw = ev.target.value.replace(/[$,\s]/g, '');
+                if (raw === '') onChange({ inputCostCents: null });
+                else { const v = Number(raw); if (Number.isFinite(v) && v >= 0) onChange({ inputCostCents: Math.round(v * 100) }); }
+              }} />
+          </span>
+        </label>
+        <label className="flex items-center gap-2 pb-2 text-[13px]"><input type="checkbox" className="!w-auto" checked={settings.inputCostIncludesTax} disabled={disabled} onChange={(ev) => onChange({ inputCostIncludesTax: ev.target.checked })} data-testid="input-cost-tax" />Incluye IVA</label>
+      </div>
+      <p className="mt-1.5 text-[12px] text-muted">
+        {settings.inputCostCents === null
+          ? <>Sin capturar: se usa lo que estima el despiece, <b className="text-[#e5edf3]">{mxn(estimatedCents)}</b> sin IVA.</>
+          : <>El despiece estima {mxn(estimatedCents)} sin IVA. <button type="button" className="font-semibold text-[#bce8f2] underline" onClick={() => onChange({ inputCostCents: null })} disabled={disabled}>Usar la estimación</button></>}
+      </p>
+    </section>
+  );
+}
+
+/** Precio de venta saludable a partir del costo de insumos, comparado con Monterrey. */
 export function PriceTab({ plan, project, onPricing, readOnly }: { plan: ManufacturingPlan; project: Project; onPricing: (p: PricingSettings) => void; readOnly?: boolean }) {
-  const settings = project.pricing.market ?? DEFAULT_MARKET;
+  const settings = project.pricing.market ?? defaultMarket();
   const e = useMemo(() => marketEstimate(project, plan, DEFAULT_CATALOG, settings), [project, plan, settings]);
   const [chosen, setChosen] = useState<PriceTier['id'] | null>(null);
   const [copied, setCopied] = useState(false);
-  const tier = e.tiers.find((t) => t.id === (chosen ?? e.recommended))!;
+  const tier = e.tiers.find((x) => x.id === (chosen ?? e.recommended))!;
   const setM = (patch: Partial<MarketSettings>) => onPricing({ ...project.pricing, market: { ...settings, ...patch } });
   const t = e.totals;
-  const parts = [
-    { label: 'Material', v: t.materialsCents }, { label: 'Consumibles', v: t.consumablesCents }, { label: 'Mano de obra', v: t.laborCents },
-    { label: 'Flete', v: t.transportCents }, { label: 'Indirectos', v: t.overheadCents }, { label: 'Imprevistos', v: t.contingencyCents },
+  const tax = project.pricing.taxRatePct;
+
+  // Cómo se forma el precio del nivel elegido (cada renglón como % del precio)
+  const steps = [
+    { label: 'Insumos', v: t.materialsCents, color: '#4fb3c9', note: e.inputSource === 'capturado' ? 'lo que capturaste' : 'estimado del despiece' },
+    { label: 'Consumibles', v: t.consumablesCents, color: '#7fc8a9', note: `${settings.consumablesPct} % de insumos: pegamento, lija, tornillería menor` },
+    { label: 'Mano de obra', v: t.laborCents, color: '#e0b45a', note: `${e.labor.reduce((s, l) => s + l.hours, 0).toFixed(1)} h de taller e instalación` },
+    { label: 'Flete', v: t.transportCents, color: '#b38ad6', note: 'viajes a obra' },
+    { label: 'Indirectos', v: t.overheadCents, color: '#8a9bab', note: `${settings.overheadPct} %: renta, luz, herramienta, vehículo` },
+    { label: 'Imprevistos y garantía', v: t.contingencyCents, color: '#d9826b', note: `${settings.contingencyPct} %` },
+    { label: 'Venta y cobro', v: tier.salesCents, color: '#c9a3e8', note: `${settings.salesCostPct + settings.paymentFeePct} % del precio: comisión, publicidad, terminal` },
+    { label: 'Utilidad neta', v: tier.netProfitCents, color: '#56c28a', note: `${tier.netMarginPct} % del precio (antes de ISR)` },
   ];
 
   // Escala de la barra de mercado
@@ -41,7 +92,6 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
 
   function proposal() {
     const led = tier.withoutLedBeforeTaxCents !== null;
-    const tax = project.pricing.taxRatePct;
     const lines = [
       `Propuesta: ${project.name}`,
       project.customer ? `Cliente: ${project.customer}` : '',
@@ -59,32 +109,72 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
 
   return (
     <div className="grid gap-5" data-testid="price-tab">
+      <InputCost settings={settings} estimatedCents={t.estimatedMaterialsCents} onChange={setM} disabled={readOnly} />
+
       <div className="flex flex-wrap items-center gap-2">
-        <BigStat icon={<Wallet className="h-5 w-5" />} value={mxn(t.costCents)} label="costo total" />
         <BigStat icon={<BadgeDollarSign className="h-5 w-5" />} value={<span data-testid="price-recommended">{mxn(tier.beforeTaxCents)}</span>} label={`precio ${tier.label.toLowerCase()} + IVA`} tone="ok" />
-        <BigStat icon={<TrendingUp className="h-5 w-5" />} value={mxn(tier.beforeTaxCents - t.costCents)} label={`utilidad (${tier.marginPct} %)`} tone="info" />
-        {tier.perLinearMCents !== null && <BigStat icon={<Ruler className="h-5 w-5" />} value={mxn(tier.perLinearMCents)} label="por metro lineal" />}
+        <BigStat icon={<Wallet className="h-5 w-5" />} value={mxn(tier.totalCents)} label="total con IVA" />
+        <BigStat icon={<TrendingUp className="h-5 w-5" />} value={mxn(tier.netProfitCents)} label={`utilidad neta (${tier.netMarginPct} %)`} tone="info" />
+        {tier.inputMultiplier !== null && <BigStat value={`${tier.inputMultiplier} ×`} label="sobre insumos" />}
         <Button className="ml-auto" variant="secondary" onClick={proposal} data-testid="copy-proposal">{copied ? <Check aria-hidden className="mr-1 inline h-4 w-4" /> : <ClipboardCopy aria-hidden className="mr-1 inline h-4 w-4" />}{copied ? 'Copiada' : 'Copiar propuesta'}</Button>
       </div>
 
       {/* Niveles de precio */}
       <section>
-        <div className="mb-2 flex items-center gap-2"><h2 className="text-[16px] font-bold">Precio de venta</h2><Hint>Tres niveles con distinto margen sobre venta. Se compara cada uno con el rango de precios de Monterrey para este tipo de mueble ({MARKET_REGION}, referencia {MARKET_REFERENCE_DATE}).</Hint></div>
+        <div className="mb-2 flex items-center gap-2"><h2 className="text-[16px] font-bold">Precio de venta</h2><Hint>Mismo costo, distinta utilidad neta: Mínimo (piso, no vender debajo), Saludable (lo recomendado para un taller sano) y Premium. Cada uno se compara con el rango de Monterrey para este tipo de mueble.</Hint></div>
         <div role="radiogroup" aria-label="Nivel de precio" className="grid gap-2 sm:grid-cols-3">
           {e.tiers.map((x) => {
             const sel = x.id === tier.id;
             return (
               <button key={x.id} type="button" role="radio" aria-checked={sel} onClick={() => setChosen(x.id)} data-testid={`tier-${x.id}`}
                 className={`grid gap-1 rounded-xl border p-3 text-left transition ${sel ? 'border-accent bg-[#173342] ring-2 ring-accent/40' : 'border-line bg-panel-2 hover:border-[#4b6a7d]'}`}>
-                <span className="flex flex-wrap items-center gap-1.5 text-[14px] font-bold">{x.label}<span className="text-[12px] font-semibold text-muted">margen {x.marginPct} %</span>{x.id === e.recommended && <Badge tone="ok">Recomendado</Badge>}</span>
+                <span className="flex flex-wrap items-center gap-1.5 text-[14px] font-bold">{x.label}<span className="text-[12px] font-semibold text-muted">utilidad {x.netMarginPct} %</span>{x.id === e.recommended && <Badge tone="ok">Recomendado</Badge>}</span>
                 <span className="text-[22px] font-extrabold leading-tight">{mxn(x.beforeTaxCents)}<span className="ml-1 text-[12px] font-semibold text-muted">+ IVA</span></span>
-                <span className="text-[12.5px] text-muted">Total con IVA <b className="text-[#e5edf3]">{mxn(x.totalCents)}</b>{x.perLinearMCents !== null && <> · {mxn(x.perLinearMCents)}/m</>}</span>
+                <span className="text-[12.5px] text-muted">Con IVA <b className="text-[#e5edf3]">{mxn(x.totalCents)}</b>{x.perLinearMCents !== null && <> · {mxn(x.perLinearMCents)}/m</>}</span>
                 {x.withoutLedBeforeTaxCents !== null && <span className="text-[12px] text-[#ffe27a]">Sin LED: {mxn(x.withoutLedBeforeTaxCents)} + IVA</span>}
                 <span><Badge tone={POS[x.position].tone}>{POS[x.position].label}</Badge></span>
               </button>
             );
           })}
         </div>
+      </section>
+
+      {/* Cómo se forma el precio */}
+      <section data-testid="price-breakdown">
+        <h3 className="mb-1.5 text-[13px] font-bold">Cómo se forma el precio {tier.label.toLowerCase()}</h3>
+        <div className="flex h-5 w-full overflow-hidden rounded-full" aria-hidden>
+          {steps.map((s) => s.v > 0 && <span key={s.label} style={{ width: `${(s.v / tier.beforeTaxCents) * 100}%`, background: s.color }} title={`${s.label}: ${mxn(s.v)}`} />)}
+        </div>
+        <ol className="mt-2 grid gap-1 text-[12.5px]">
+          {steps.map((s, i) => (
+            <li key={s.label} className="grid grid-cols-[14px_1fr_auto_44px] items-center gap-2">
+              <span className="h-3 w-3 rounded-sm" style={{ background: s.color }} />
+              <span><b>{i === 0 ? '' : '+ '}{s.label}</b> <span className="text-muted">· {s.note}</span></span>
+              <b className="text-right">{mxn(s.v)}</b>
+              <span className="text-right text-muted">{tier.beforeTaxCents ? Math.round((s.v / tier.beforeTaxCents) * 100) : 0} %</span>
+            </li>
+          ))}
+          <li className="grid grid-cols-[14px_1fr_auto_44px] items-center gap-2 border-t border-line pt-1 text-[13.5px]">
+            <span /><b>= Precio sin IVA</b><b className="text-right text-[#9fe0bd]">{mxn(tier.beforeTaxCents)}</b><span className="text-right text-muted">100 %</span>
+          </li>
+          <li className="grid grid-cols-[14px_1fr_auto_44px] items-center gap-2 text-muted">
+            <span /><span>+ IVA {tax} % → total al cliente</span><span className="text-right font-semibold text-[#e5edf3]">{mxn(tier.totalCents)}</span><span />
+          </li>
+        </ol>
+        {t.ledCents > 0 && <p className="mt-1.5 flex items-center gap-1 text-[12px] text-[#ffe27a]"><Lightbulb aria-hidden className="h-3.5 w-3.5" />LED (material + mano de obra): {mxn(t.ledCents)} en {e.ledM} m</p>}
+      </section>
+
+      {/* Salud del precio recomendado */}
+      <section data-testid="price-health">
+        <h3 className="mb-1.5 text-[13px] font-bold">¿Es un precio sano? <span className="font-normal text-muted">(precio {e.tiers.find((x) => x.id === e.recommended)!.label.toLowerCase()})</span></h3>
+        <ul className="grid gap-1.5 sm:grid-cols-2">
+          {e.health.map((h) => (
+            <li key={h.id} className={`flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-[12.5px] ${h.ok ? 'bg-ok-bg' : 'bg-warn-bg'}`}>
+              {h.ok ? <CircleCheck aria-hidden className="mt-[1px] h-4 w-4 shrink-0 text-ok" /> : <TriangleAlert aria-hidden className="mt-[1px] h-4 w-4 shrink-0 text-warn" />}
+              <span><b>{h.label}.</b> <span className="text-muted">{h.detail}</span></span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* Rango de mercado */}
@@ -97,7 +187,7 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
             <div className="absolute top-3 h-7 w-[3px] rounded bg-[#d9826b]" style={{ left: pct(t.costCents) }} title="Costo" />
             <span className="absolute top-10 -translate-x-1/2 text-[11px] font-semibold text-[#f0b2a3]" style={{ left: pct(t.costCents) }}>Costo</span>
             {e.tiers.map((x) => (
-              <span key={x.id} className={`absolute top-0 -translate-x-1/2 text-[11px] font-bold ${x.id === tier.id ? 'text-accent' : 'text-muted'}`} style={{ left: pct(x.beforeTaxCents) }}>▼</span>
+              <span key={x.id} className={`absolute top-0 -translate-x-1/2 text-[11px] font-bold ${x.id === tier.id ? 'text-accent' : 'text-muted'}`} style={{ left: pct(x.beforeTaxCents) }} title={x.label}>▼</span>
             ))}
           </div>
           <div className="flex justify-between text-[12px] text-muted"><span>{mxn(e.market.lowCents)}</span><span className="font-semibold text-[#9fe0bd]">rango de mercado</span><span>{mxn(e.market.highCents)}</span></div>
@@ -107,24 +197,27 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
         </section>
       )}
 
-      {/* En qué se va el dinero */}
-      <section>
-        <h3 className="mb-1.5 text-[13px] font-bold">En qué se va el costo</h3>
-        <div className="flex h-4 w-full overflow-hidden rounded-full" aria-hidden>
-          {parts.map((p, i) => p.v > 0 && <span key={p.label} style={{ width: `${(p.v / t.costCents) * 100}%`, background: COST_COLORS[i] }} title={`${p.label}: ${mxn(p.v)}`} />)}
-        </div>
-        <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[12.5px] sm:grid-cols-3">
-          {parts.map((p, i) => <li key={p.label} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: COST_COLORS[i] }} />{p.label}<b className="ml-auto">{mxn(p.v)}</b></li>)}
-        </ul>
-        {t.ledCents > 0 && <p className="mt-1.5 flex items-center gap-1 text-[12px] text-[#ffe27a]"><Lightbulb aria-hidden className="h-3.5 w-3.5" />LED (material + mano de obra): {mxn(t.ledCents)} en {e.ledM} m</p>}
-      </section>
-
       <ul className="grid gap-1.5" aria-label="Recomendaciones">
         {e.advice.map((a) => <li key={a} className="rounded-lg bg-[#162a36] px-3 py-1.5 text-[12.5px]">{a}</li>)}
-        {e.unpriced.length > 0 && <li className="rounded-lg bg-err-bg px-3 py-1.5 text-[12.5px] text-err">Sin precio (no se suma): {e.unpriced.join(', ')}</li>}
+        {e.inputSource === 'estimado' && e.unpriced.length > 0 && <li className="rounded-lg bg-err-bg px-3 py-1.5 text-[12.5px] text-err">Sin precio en la estimación: {e.unpriced.join(', ')}</li>}
       </ul>
 
-      <More summary={<>Materiales <span className="text-[12px] font-normal text-muted">{mxn(t.materialsCents)} · {e.referenceSharePct} % con precio de referencia</span></>} testId="price-materials">
+      <More summary={<>Mano de obra <span className="text-[12px] font-normal text-muted">{mxn(t.laborCents)} · {e.labor.reduce((s, l) => s + l.hours, 0).toFixed(1)} h</span></>}>
+        <table className="w-full text-[12.5px]">
+          <tbody>
+            {e.labor.map((l) => (
+              <tr key={l.id} className="border-t border-line align-top">
+                <td className="py-1.5 pr-2">{l.label}<div className="text-[11px] text-muted">{l.basis}</div></td>
+                <td className="pr-2 text-right whitespace-nowrap">{l.hours} h</td>
+                <td className="pr-2 text-[11.5px] text-muted">{l.crew}</td>
+                <td className="text-right font-semibold">{mxn(l.cents)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </More>
+
+      <More summary={<>Detalle estimado de insumos <span className="text-[12px] font-normal text-muted">{mxn(t.estimatedMaterialsCents)} · sirve para revisar que tu lista esté completa</span></>} testId="price-materials">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-[12.5px]">
             <thead><tr className="text-left text-muted"><th className="py-1 pr-2">Concepto</th><th className="pr-2 text-right">Cantidad</th><th className="pr-2">Precio unitario (sin IVA)</th><th className="pr-2 text-right">Importe</th><th>Origen</th></tr></thead>
@@ -156,41 +249,29 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[11.5px] text-muted">Prioridad: oferta de proveedor (pestaña Proveedores) → precio capturado aquí → referencia de Monterrey. Deja el campo vacío para volver a la referencia.</p>
+        <p className="mt-2 text-[11.5px] text-muted">Si capturaste el costo de tus insumos arriba, el precio usa ese total; esta lista sólo sirve para comparar. Prioridad de la estimación: oferta de proveedor → precio capturado aquí → referencia de Monterrey.</p>
       </More>
 
-      <More summary={<>Mano de obra <span className="text-[12px] font-normal text-muted">{mxn(t.laborCents)} · {e.labor.reduce((s, l) => s + l.hours, 0).toFixed(1)} h</span></>}>
-        <table className="w-full text-[12.5px]">
-          <tbody>
-            {e.labor.map((l) => (
-              <tr key={l.id} className="border-t border-line align-top">
-                <td className="py-1.5 pr-2">{l.label}<div className="text-[11px] text-muted">{l.basis}</div></td>
-                <td className="pr-2 text-right whitespace-nowrap">{l.hours} h</td>
-                <td className="pr-2 text-[11.5px] text-muted">{l.crew}</td>
-                <td className="text-right font-semibold">{mxn(l.cents)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </More>
-
-      <More summary="Ajustes del costeo" testId="price-settings">
+      <More summary="Ajustes del negocio" testId="price-settings">
         <fieldset disabled={readOnly} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <NumberInput label="Día de oficial" suffix="$" value={settings.laborDayCents / 100} min={0} onChange={(v) => setM({ laborDayCents: Math.round(v * 100) })} hint="Con carga social" testId="market-labor" />
+          {(['Mínimo', 'Saludable', 'Premium'] as const).map((label, i) => (
+            <NumberInput key={label} label={`Utilidad ${label.toLowerCase()}`} suffix="%" value={settings.netMarginsPct[i]!} min={0} max={60} testId={`market-margin-${i}`}
+              onChange={(v) => { const next = [...settings.netMarginsPct] as [number, number, number]; next[i] = Math.min(60, Math.max(0, v)); setM({ netMarginsPct: next }); }} />
+          ))}
+          <NumberInput label="Día de oficial" suffix="$" value={settings.laborDayCents / 100} min={0} onChange={(v) => setM({ laborDayCents: Math.round(v * 100) })} hint="Con prestaciones" testId="market-labor" />
           <NumberInput label="Día de ayudante" suffix="$" value={settings.helperDayCents / 100} min={0} onChange={(v) => setM({ helperDayCents: Math.round(v * 100) })} />
           <NumberInput label="Indirectos" suffix="%" value={settings.overheadPct} min={0} max={200} onChange={(v) => setM({ overheadPct: v })} hint="Renta, luz, herramienta, vehículo" />
-          <NumberInput label="Consumibles" suffix="%" value={settings.consumablesPct} min={0} max={100} onChange={(v) => setM({ consumablesPct: v })} hint="Sobre material" />
+          <NumberInput label="Consumibles" suffix="%" value={settings.consumablesPct} min={0} max={100} onChange={(v) => setM({ consumablesPct: v })} hint="Sobre insumos" />
           <NumberInput label="Imprevistos" suffix="%" value={settings.contingencyPct} min={0} max={100} onChange={(v) => setM({ contingencyPct: v })} hint="Garantía y retrabajos" />
+          <NumberInput label="Venta" suffix="%" value={settings.salesCostPct} min={0} max={50} onChange={(v) => setM({ salesCostPct: v })} hint="Comisión, publicidad, visitas" />
+          <NumberInput label="Cobro" suffix="%" value={settings.paymentFeePct} min={0} max={20} onChange={(v) => setM({ paymentFeePct: v })} hint="Terminal, transferencias" />
           <NumberInput label="Flete por viaje" suffix="$" value={settings.transportTripCents / 100} min={0} onChange={(v) => setM({ transportTripCents: Math.round(v * 100) })} />
           <NumberInput label="Viajes (0 = auto)" value={settings.trips ?? 0} min={0} max={100} onChange={(v) => setM({ trips: v > 0 ? Math.round(v) : null })} />
-          {(['Competitivo', 'Mercado', 'Premium'] as const).map((label, i) => (
-            <NumberInput key={label} label={`Margen ${label.toLowerCase()}`} suffix="%" value={settings.tierMarginsPct[i]!} min={0} max={95} testId={`market-margin-${i}`}
-              onChange={(v) => { const next = [...settings.tierMarginsPct] as [number, number, number]; next[i] = Math.min(95, Math.max(0, v)); setM({ tierMarginsPct: next }); }} />
-          ))}
           <label className="col-span-2 flex items-center gap-2 text-[13px] sm:col-span-3"><input type="checkbox" className="!w-auto" checked={settings.includeInstallation} onChange={(ev) => setM({ includeInstallation: ev.target.checked })} />Incluir instalación en obra</label>
         </fieldset>
+        <p className="mt-2 text-[11.5px] text-muted">Valores de un taller sano en {MARKET_REGION}: utilidad neta 15–25 %, indirectos 15–25 %, imprevistos 5 %. Ajústalos a tus números reales.</p>
       </More>
-      <p className="text-[11.5px] text-muted">Precios de referencia de {MARKET_REGION}, {MARKET_REFERENCE_DATE}, sin IVA. Son un punto de partida: confirma con tus proveedores y ajusta salarios e indirectos a tu taller.</p>
+      <p className="text-[11.5px] text-muted">Rangos de mercado y precios de referencia: {MARKET_REGION}, {MARKET_REFERENCE_DATE}, sin IVA. Son un punto de partida; confirma con tus proveedores.</p>
     </div>
   );
 }

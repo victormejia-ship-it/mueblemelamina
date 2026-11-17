@@ -114,14 +114,19 @@ describe('costeo y precio de venta (Monterrey)', () => {
     expect(e.materials.some((m) => m.key === 'hw:led_strip_cob12v' && m.source === 'referencia')).toBe(true);
   });
 
-  it('niveles de precio: margen sobre venta, IVA y opción sin LED', () => {
+  it('niveles de precio: utilidad neta después de venta y cobro, IVA y opción sin LED', () => {
     const p = kitchen();
     const e = marketEstimate(p, planProject(p, cat, [], '2026-11-16', NOW), cat);
     const [a, b, c] = e.tiers;
+    expect(e.tiers.map((x) => x.id)).toEqual(['minimo', 'saludable', 'premium']);
     expect(a!.beforeTaxCents).toBeLessThan(b!.beforeTaxCents);
     expect(b!.beforeTaxCents).toBeLessThan(c!.beforeTaxCents);
-    // margen sobre venta: (precio − costo) / precio ≈ margen (redondeo a pesos)
-    expect((b!.beforeTaxCents - e.totals.costCents) / b!.beforeTaxCents).toBeCloseTo(b!.marginPct / 100, 2);
+    // Precio − costo − venta/cobro = utilidad neta ≈ % objetivo del precio (redondeo a pesos)
+    expect(b!.netProfitCents).toBe(b!.beforeTaxCents - e.totals.costCents - b!.salesCents);
+    expect(b!.netProfitCents / b!.beforeTaxCents).toBeCloseTo(0.18, 2);
+    expect(b!.salesCents).toBe(Math.round(b!.beforeTaxCents * 0.07));
+    expect(e.recommended).toBe('saludable');
+    expect(e.health.find((h) => h.id === 'utilidad')!.ok).toBe(true);
     expect(b!.taxCents).toBe(Math.round(b!.beforeTaxCents * 0.16));
     expect(b!.withoutLedBeforeTaxCents!).toBeLessThan(b!.beforeTaxCents);
     expect(e.market!.lowCents).toBeLessThan(e.market!.highCents);
@@ -141,6 +146,22 @@ describe('costeo y precio de venta (Monterrey)', () => {
     p.pricing.market.laborDayCents = 600000; // salario irreal: precio muy alto
     const e = marketEstimate(p, planProject(p, cat, [], '2026-11-16', NOW), cat);
     expect(e.tiers[1]!.position).toBe('arriba');
-    expect(e.recommended).not.toBe('mercado');
+    expect(e.recommended).toBe('minimo');
+  });
+
+  it('parte del costo de insumos que captura el usuario (con o sin IVA)', () => {
+    const p = kitchen();
+    const plan = planProject(p, cat, [], '2026-11-16', NOW);
+    p.pricing.market.inputCostCents = 1_160_000;
+    const sinIva = marketEstimate(p, plan, cat);
+    expect(sinIva.inputSource).toBe('capturado');
+    expect(sinIva.totals.materialsCents).toBe(1_160_000);
+    p.pricing.market.inputCostIncludesTax = true;
+    const conIva = marketEstimate(p, plan, cat);
+    expect(conIva.totals.materialsCents).toBe(1_000_000);
+    expect(conIva.tiers[1]!.beforeTaxCents).toBeLessThan(sinIva.tiers[1]!.beforeTaxCents);
+    // Un taller sano cobra al menos ~2 veces sus insumos y el anticipo alcanza para comprarlos
+    expect(conIva.tiers[1]!.inputMultiplier!).toBeGreaterThanOrEqual(2);
+    expect(conIva.health.find((h) => h.id === 'anticipo')!.ok).toBe(true);
   });
 });

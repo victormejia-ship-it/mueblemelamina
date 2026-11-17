@@ -91,6 +91,17 @@ const FAMILY_RANGE: Record<string, keyof typeof MARKET_RANGES_MTY> = {
 };
 
 export interface MarketSettings {
+  /**
+   * Costo total de insumos que captura el usuario (lo que paga por melamina, canto, herrajes, LED…).
+   * null = se estima con el despiece y precios de proveedor/referencia.
+   */
+  inputCostCents: Cents | null;
+  /** El costo de insumos capturado incluye IVA (se le quita para costear). */
+  inputCostIncludesTax: boolean;
+  /** Gastos de venta sobre el precio: comisión, publicidad, visitas y diseño. */
+  salesCostPct: number;
+  /** Costo de cobro sobre el precio (terminal, transferencias, financiamiento). */
+  paymentFeePct: number;
   /** Día de oficial carpintero con carga social (MXN centavos). */
   laborDayCents: Cents;
   /** Día de ayudante con carga social. */
@@ -106,24 +117,39 @@ export interface MarketSettings {
   /** Viajes; null = automático (1 por cada 6 módulos). */
   trips: number | null;
   includeInstallation: boolean;
-  /** Márgenes sobre venta de los tres niveles de precio. */
-  tierMarginsPct: [number, number, number];
+  /** Utilidad neta objetivo (sobre el precio, antes de ISR) de los niveles mínimo, saludable y premium. */
+  netMarginsPct: [number, number, number];
   /** Precio unitario capturado por el usuario (sin IVA), por clave de producto. */
   priceOverrides: Record<string, Cents>;
 }
 
+/**
+ * Parámetros de un taller sano (pequeño/mediano, Monterrey). Base:
+ * - Mano de obra pagada a salario de mercado con prestaciones (no «lo que sobre»).
+ * - Indirectos 18 %: renta, luz, herramienta y su desgaste, vehículo, administración.
+ * - Imprevistos 5 %: retrabajos y garantía.
+ * - Venta 5 % y cobro 2 %: comisión, publicidad, visitas, terminal.
+ * - Utilidad neta objetivo 18 % (antes de ISR): reinversión y colchón; 10 % es el piso, 25 % premium.
+ */
 export const DEFAULT_MARKET: MarketSettings = {
+  inputCostCents: null,
+  inputCostIncludesTax: false,
+  salesCostPct: 5,
+  paymentFeePct: 2,
   laborDayCents: 100000,
   helperDayCents: 60000,
   overheadPct: 18,
-  consumablesPct: 5,
+  consumablesPct: 3,
   contingencyPct: 5,
   transportTripCents: 90000,
   trips: null,
   includeInstallation: true,
-  tierMarginsPct: [28, 38, 48],
+  netMarginsPct: [10, 18, 25],
   priceOverrides: {},
 };
+
+/** Copia independiente de los valores por defecto (para proyectos nuevos y migrados). */
+export const defaultMarket = (): MarketSettings => ({ ...DEFAULT_MARKET, netMarginsPct: [...DEFAULT_MARKET.netMarginsPct] as [number, number, number], priceOverrides: {} });
 
 export type CostSource = 'proveedor' | 'capturado' | 'referencia' | 'sin_precio';
 
@@ -144,7 +170,15 @@ export interface MarketMaterialLine {
 export interface LaborLine { id: string; label: string; hours: number; crew: 'oficial' | 'oficial+ayudante'; cents: Cents; basis: string }
 
 export interface PriceTier {
-  id: 'competitivo' | 'mercado' | 'premium'; label: string; marginPct: number;
+  id: 'minimo' | 'saludable' | 'premium'; label: string;
+  /** Utilidad neta sobre el precio (antes de ISR). */
+  netMarginPct: number;
+  /** Margen bruto: (precio − costo total) / precio. */
+  marginPct: number;
+  netProfitCents: Cents;
+  salesCents: Cents;
+  /** Precio ÷ costo de insumos. */
+  inputMultiplier: number | null;
   beforeTaxCents: Cents; taxCents: Cents; totalCents: Cents; perLinearMCents: Cents | null;
   position: 'debajo' | 'dentro' | 'arriba' | 'sin_referencia';
   /** Mismo nivel sin la opción LED (sin IVA); null si el proyecto no lleva LED. */
@@ -159,6 +193,8 @@ export interface MarketEstimate {
   totals: {
     materialsCents: Cents; consumablesCents: Cents; laborCents: Cents; transportCents: Cents;
     directCents: Cents; overheadCents: Cents; contingencyCents: Cents; costCents: Cents;
+    /** Insumos estimados por el despiece (para comparar con lo capturado). */
+    estimatedMaterialsCents: Cents;
     /** Parte del costo que es LED (material + mano de obra), para mostrarla por separado. */
     ledCents: Cents;
   };
@@ -168,6 +204,10 @@ export interface MarketEstimate {
   market: { lowCents: Cents; highCents: Cents; breakdown: { label: string; linearM: number; lowCents: Cents; highCents: Cents }[] } | null;
   tiers: PriceTier[];
   recommended: PriceTier['id'];
+  /** De dónde sale el costo de insumos. */
+  inputSource: 'capturado' | 'estimado';
+  /** Revisión de salud del precio recomendado. */
+  health: { id: string; ok: boolean; label: string; detail: string }[];
   advice: string[];
   /** Material sin precio de proveedor ni referencia (no se suma: completar). */
   unpriced: string[];
@@ -220,8 +260,12 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
       unitCents: unit, totalCents: total, source, lowCents: refp?.lowCents ?? null, highCents: refp?.highCents ?? null, ...(refp?.note ? { note: refp.note } : {}),
     });
   }
-  const materialsCents = materials.reduce((s, m) => s + m.totalCents, 0);
-  const refCents = materials.filter((m) => m.source === 'referencia').reduce((s, m) => s + m.totalCents, 0);
+  const estimatedMaterialsCents = materials.reduce((s, m) => s + m.totalCents, 0);
+  const inputSource: MarketEstimate['inputSource'] = settings.inputCostCents !== null && settings.inputCostCents > 0 ? 'capturado' : 'estimado';
+  const materialsCents = inputSource === 'capturado'
+    ? Math.round(settings.inputCostIncludesTax ? settings.inputCostCents! / (1 + taxPct / 100) : settings.inputCostCents!)
+    : estimatedMaterialsCents;
+  const refCents = inputSource === 'capturado' ? 0 : materials.filter((m) => m.source === 'referencia').reduce((s, m) => s + m.totalCents, 0);
   const consumablesCents = Math.round(materialsCents * settings.consumablesPct / 100);
 
   // --- Mano de obra por proceso (minutos de taller típicos; editable vía salario)
@@ -267,7 +311,9 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
   const overheadCents = Math.round(directCents * settings.overheadPct / 100);
   const contingencyCents = Math.round((directCents + overheadCents) * settings.contingencyPct / 100);
   const costCents = directCents + overheadCents + contingencyCents;
-  const ledMat = materials.filter((m) => m.key.startsWith('hw:led_')).reduce((s, m) => s + m.totalCents, 0);
+  // Si el usuario capturó sus insumos, la parte LED se estima en la misma proporción que en el despiece.
+  const ledShare = estimatedMaterialsCents ? materials.filter((m) => m.key.startsWith('hw:led_')).reduce((s, m) => s + m.totalCents, 0) / estimatedMaterialsCents : 0;
+  const ledMat = Math.round(materialsCents * ledShare);
   const ledLab = labor.filter((l) => l.id === 'router' || l.id === 'led').reduce((s, l) => s + l.cents, 0);
 
   // --- Rango de mercado del proyecto (por metro lineal de frente de cada módulo)
@@ -290,44 +336,62 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
   const market = breakdown.length ? { lowCents: breakdown.reduce((s, g) => s + g.lowCents, 0), highCents: breakdown.reduce((s, g) => s + g.highCents, 0), breakdown } : null;
   const linearM = r2(project.modules.reduce((s, m) => s + m.widthMm, 0) / 1000);
 
-  const labels: Record<PriceTier['id'], string> = { competitivo: 'Competitivo', mercado: 'Mercado', premium: 'Premium' };
-  const ids: PriceTier['id'][] = ['competitivo', 'mercado', 'premium'];
-  const ledCost = Math.round((ledMat + ledLab) * (1 + settings.overheadPct / 100) * (1 + settings.contingencyPct / 100));
+  const labels: Record<PriceTier['id'], string> = { minimo: 'Mínimo', saludable: 'Saludable', premium: 'Premium' };
+  const ids: PriceTier['id'][] = ['minimo', 'saludable', 'premium'];
+  const ledCost = Math.round((ledMat * (1 + settings.consumablesPct / 100) + ledLab) * (1 + settings.overheadPct / 100) * (1 + settings.contingencyPct / 100));
+  const salesPct = settings.salesCostPct + settings.paymentFeePct;
+  const priceFor = (cost: number, net: number) => Math.round(cost / (1 - Math.min(0.95, (salesPct + net) / 100)) / 100) * 100; // redondeo a pesos
   const tiers: PriceTier[] = ids.map((id, i) => {
-    const marginPct = Math.min(90, Math.max(0, settings.tierMarginsPct[i] ?? 35));
-    const before = Math.round(costCents / (1 - marginPct / 100) / 100) * 100; // redondeo a pesos
+    const net = Math.min(60, Math.max(0, settings.netMarginsPct[i] ?? 18));
+    const before = priceFor(costCents, net);
     const tax = Math.round(before * taxPct / 100);
+    const salesCents = Math.round(before * salesPct / 100);
     const position: PriceTier['position'] = !market ? 'sin_referencia' : before < market.lowCents ? 'debajo' : before > market.highCents ? 'arriba' : 'dentro';
-    const withoutLed = ledM > 0 ? Math.round((costCents - ledCost) / (1 - marginPct / 100) / 100) * 100 : null;
-    return { id, label: labels[id], marginPct, beforeTaxCents: before, taxCents: tax, totalCents: before + tax, perLinearMCents: linearM > 0 ? Math.round(before / linearM) : null, position, withoutLedBeforeTaxCents: withoutLed };
+    return {
+      id, label: labels[id], netMarginPct: net, marginPct: before ? Math.round(((before - costCents) / before) * 1000) / 10 : 0,
+      netProfitCents: before - costCents - salesCents, salesCents, inputMultiplier: materialsCents ? Math.round((before / materialsCents) * 100) / 100 : null,
+      beforeTaxCents: before, taxCents: tax, totalCents: before + tax, perLinearMCents: linearM > 0 ? Math.round(before / linearM) : null, position,
+      withoutLedBeforeTaxCents: ledM > 0 ? priceFor(costCents - ledCost, net) : null,
+    };
   });
 
-  // --- Recomendación
+  // --- Recomendación: el precio saludable, salvo que el mercado diga otra cosa (nunca debajo del mínimo).
   const advice: string[] = [];
-  let recommended: PriceTier['id'] = 'mercado';
+  let recommended: PriceTier['id'] = 'saludable';
   const mid = tiers[1]!;
   if (market) {
     if (mid.position === 'arriba') {
-      const fit = tiers.find((t) => t.position === 'dentro');
-      recommended = fit?.id ?? 'competitivo';
-      advice.push(fit ? `El precio de mercado queda arriba del rango de Monterrey; se recomienda «${fit.label}».` : 'Incluso el precio competitivo queda arriba del rango: revisar costos (material, horas o indirectos) o justificar con acabados y herrajes superiores.');
+      recommended = 'minimo';
+      advice.push(tiers[0]!.position === 'arriba'
+        ? 'Aun con la utilidad mínima quedas arriba del mercado de Monterrey: baja costos (compra de material, horas de taller o indirectos) o justifica con herrajes y acabados superiores. No vendas debajo del mínimo.'
+        : 'El precio saludable queda arriba del mercado; el mínimo sí entra. Úsalo para competir, pero revisa tus costos: con utilidad mínima hay poco colchón.');
     } else if (mid.position === 'debajo') {
-      const fit = [...tiers].reverse().find((t) => t.position !== 'arriba');
-      recommended = fit?.id ?? 'premium';
-      advice.push(`Tu costo permite cobrar más: el rango de mercado empieza en ${Math.round(market.lowCents / 100).toLocaleString('es-MX')} MXN sin IVA. Se recomienda «${labels[recommended]}».`);
+      recommended = tiers[2]!.position === 'arriba' ? 'saludable' : 'premium';
+      advice.push(`El mercado paga más que tu precio saludable (desde ${Math.round(market.lowCents / 100).toLocaleString('es-MX')} MXN sin IVA): ${recommended === 'premium' ? 'puedes cobrar el precio premium' : 'puedes subir hacia el rango de mercado'}.`);
     } else {
-      advice.push('El precio de mercado cae dentro del rango de Monterrey para este tipo de mueble.');
+      advice.push('El precio saludable cae dentro del rango de Monterrey para este tipo de mueble.');
     }
   }
-  if (mid.marginPct < 30) advice.push('Margen menor a 30 %: en carpintería a medida suele no cubrir retrabajos y garantías.');
-  if (refCents > materialsCents * 0.5) advice.push('Más de la mitad del material usa precios de referencia: captura ofertas reales de tus proveedores antes de cerrar.');
-  if (ledM > 0) advice.push(`LED empotrado: ${r2(ledM)} m. Ofrecerlo como opción separada ayuda a cerrar la venta (el cliente ve el precio con y sin LED).`);
-  advice.push('Anticipo sugerido: 60 % para comprar material; 40 % contra entrega e instalación.');
+  const rec = tiers.find((t) => t.id === recommended)!;
+  const deposit = Math.round(rec.totalCents * 0.6);
+  const inputsWithTax = Math.round((materialsCents + consumablesCents) * (1 + taxPct / 100));
+  const health: MarketEstimate['health'] = [
+    { id: 'utilidad', ok: rec.netMarginPct >= 15, label: 'Utilidad neta', detail: `${rec.netMarginPct} % del precio (${Math.round(rec.netProfitCents / 100).toLocaleString('es-MX')} MXN). Sano: 15–25 %.` },
+    { id: 'mano_obra', ok: true, label: 'Mano de obra pagada', detail: `${r2(labor.reduce((t, l) => t + l.hours, 0))} h a $${Math.round(settings.laborDayCents / 100)} por día de oficial (con prestaciones).` },
+    { id: 'indirectos', ok: settings.overheadPct >= 12, label: 'Indirectos cubiertos', detail: `${settings.overheadPct} % para renta, luz, herramienta y vehículo. Sano: 15–25 %.` },
+    { id: 'multiplicador', ok: (rec.inputMultiplier ?? 0) >= 2, label: 'Precio vs. insumos', detail: `${rec.inputMultiplier ?? '—'} × el costo de insumos. En carpintería a medida suele estar entre 2 y 3.5 ×.` },
+    { id: 'anticipo', ok: deposit >= inputsWithTax, label: 'El anticipo paga el material', detail: `Anticipo 60 % = ${Math.round(deposit / 100).toLocaleString('es-MX')} MXN; insumos con IVA ≈ ${Math.round(inputsWithTax / 100).toLocaleString('es-MX')} MXN.` },
+    ...(market ? [{ id: 'mercado', ok: rec.position === 'dentro', label: 'Dentro del mercado', detail: `Rango Monterrey ${Math.round(market.lowCents / 100).toLocaleString('es-MX')}–${Math.round(market.highCents / 100).toLocaleString('es-MX')} MXN sin IVA.` }] : []),
+  ];
+  if (inputSource === 'estimado') advice.push('Captura arriba el costo real de tus insumos para que el precio parta de lo que tú pagas (ahora se usa una estimación del despiece).');
+  else if (estimatedMaterialsCents && Math.abs(materialsCents - estimatedMaterialsCents) / estimatedMaterialsCents > 0.4) advice.push(`Tus insumos difieren más de 40 % de lo que estima el despiece (${Math.round(estimatedMaterialsCents / 100).toLocaleString('es-MX')} MXN sin IVA): revisa que estén completos (tableros, canto, herrajes, LED).`);
+  if (ledM > 0) advice.push(`LED empotrado: ${r2(ledM)} m. Ofrécelo como opción: el cliente ve el precio con y sin LED.`);
+  advice.push('Cobra 60 % de anticipo para comprar material y 40 % contra entrega e instalación.');
 
   return {
     region: MARKET_REGION, referenceDate: MARKET_REFERENCE_DATE, materials, labor,
-    totals: { materialsCents, consumablesCents, laborCents, transportCents, directCents, overheadCents, contingencyCents, costCents, ledCents: ledMat + ledLab },
-    linearM, ledM: r2(ledM), market, tiers, recommended, advice, unpriced,
+    totals: { materialsCents, consumablesCents, laborCents, transportCents, directCents, overheadCents, contingencyCents, costCents, ledCents: ledMat + ledLab, estimatedMaterialsCents },
+    linearM, ledM: r2(ledM), market, tiers, recommended, inputSource, health, advice, unpriced,
     referenceSharePct: materialsCents ? Math.round((refCents / materialsCents) * 100) : 0,
   };
 }

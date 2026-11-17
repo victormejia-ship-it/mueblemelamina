@@ -1,5 +1,5 @@
 import { catalogLookup, type Catalog } from '../catalog';
-import { DEFAULT_MARKET } from '../pricing/market';
+import { defaultMarket } from '../pricing/market';
 import { SCHEMA_VERSION, type ManufacturingSettings, type LedSpec, type ModuleSpec, type PricingSettings, type Project } from '../types';
 
 /** Valores de taller por defecto (editables por proyecto). */
@@ -35,7 +35,7 @@ export function defaultPricing(): PricingSettings {
     allowEstimatedPrices: false,
     selectedOffers: {},
     manualCosts: DEFAULT_MANUAL_COSTS.map((c) => ({ ...c })),
-    market: { ...DEFAULT_MARKET, tierMarginsPct: [...DEFAULT_MARKET.tierMarginsPct] as [number, number, number], priceOverrides: {} },
+    market: defaultMarket(),
   };
 }
 

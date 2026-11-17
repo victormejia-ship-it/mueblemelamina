@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Catalog } from '../catalog';
 import { SCHEMA_VERSION, type Project, type SupplierOffer } from '../types';
 import { DEFAULT_MANUFACTURING, createModule, defaultPricing } from './factory';
-import { DEFAULT_MARKET } from '../pricing/market';
+import { defaultMarket } from '../pricing/market';
 
 const mm = z.number().finite();
 const posMm = z.number().finite().positive();
@@ -68,6 +68,10 @@ export const PricingSchema = z.object({
   })),
   // Campo agregado después de 1.0.0: los proyectos guardados sin él usan los valores de Monterrey por defecto.
   market: z.object({
+    inputCostCents: cents.max(10_000_000_000).nullable().default(null),
+    inputCostIncludesTax: z.boolean().default(false),
+    salesCostPct: z.number().min(0).max(50).default(5),
+    paymentFeePct: z.number().min(0).max(20).default(2),
     laborDayCents: cents.max(10_000_000),
     helperDayCents: cents.max(10_000_000),
     overheadPct: z.number().min(0).max(200),
@@ -76,9 +80,9 @@ export const PricingSchema = z.object({
     transportTripCents: cents.max(100_000_000),
     trips: z.number().int().min(0).max(100).nullable(),
     includeInstallation: z.boolean(),
-    tierMarginsPct: z.tuple([z.number().min(0).lt(100), z.number().min(0).lt(100), z.number().min(0).lt(100)]),
+    netMarginsPct: z.tuple([z.number().min(0).max(60), z.number().min(0).max(60), z.number().min(0).max(60)]),
     priceOverrides: z.record(z.string(), cents),
-  }).default(() => ({ ...DEFAULT_MARKET, tierMarginsPct: [...DEFAULT_MARKET.tierMarginsPct] as [number, number, number], priceOverrides: {} })),
+  }).default(defaultMarket),
 });
 
 export const ProjectSchema = z.object({
