@@ -70,11 +70,15 @@ export function RouteFlow({ stations }: { stations: FlowStation[] }) {
                   {s.parallel && <span className="text-[11px] font-semibold text-warn">en paralelo</span>}
                 </span>
                 <span className="flex flex-wrap gap-1.5">
+                  {!!s.alerts?.length && <span className="flex items-center gap-1 rounded-full bg-warn-bg px-2 py-0.5 text-[12px] font-bold text-warn" title={s.alerts.map(t).join(' · ')} data-testid={`station-alerts-${s.id}`}><TriangleAlert aria-hidden className="h-3.5 w-3.5" />{s.alerts.length}<span className="sr-only"> aviso(s)</span></span>}
                   {s.highlights?.map((h) => <span key={h} className="rounded-full bg-[#1d3140] px-2 py-0.5 text-[12px] font-semibold text-[#cfeff7]">{t(h)}</span>)}
                 </span>
                 <span aria-hidden className="ml-auto text-muted transition-transform group-open:rotate-180">▾</span>
               </summary>
               <div className="grid gap-2 border-t border-line px-3 py-2.5 text-[12.5px]">
+                {s.alerts?.map((a) => (
+              <p key={a} className="flex items-start gap-1.5 rounded-lg bg-warn-bg px-2 py-1 text-[12px] text-warn"><TriangleAlert aria-hidden className="mt-[1px] h-3.5 w-3.5 shrink-0" />{t(a)}</p>
+            ))}
                 <p>{s.goal}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {s.equipmentIds.map((id) => <a key={id} href={`#${anchor(id)}`} className="rounded-full border border-[#3c6074] px-2 py-0.5 text-[11.5px] font-semibold text-[#bce8f2] hover:underline">{equipmentName(id)}</a>)}
@@ -87,9 +91,6 @@ export function RouteFlow({ stations }: { stations: FlowStation[] }) {
                 )}
               </div>
             </details>
-            {s.alerts?.map((a) => (
-              <p key={a} className="mt-1 flex items-start gap-1.5 rounded-lg bg-warn-bg px-2 py-1 text-[12px] text-warn"><TriangleAlert aria-hidden className="mt-[1px] h-3.5 w-3.5 shrink-0" />{t(a)}</p>
-            ))}
           </div>
         </li>
       ))}
@@ -120,7 +121,7 @@ function PpeRow({ item }: { item: EquipmentItem }) {
     <ul className="flex flex-wrap gap-1.5" aria-label="Equipo de protección">
       {item.ppe.map((p) => {
         const { icon: Icon, label } = PPE_INFO[p];
-        return <li key={p} title={label} className="flex items-center gap-1 rounded-full border border-[#907448] bg-warn-bg px-2 py-0.5 text-[11.5px] font-semibold text-warn"><Icon aria-hidden className="h-3.5 w-3.5" />{label}</li>;
+        return <li key={p} title={label} className="flex h-7 w-7 items-center justify-center rounded-full border border-[#907448] bg-warn-bg text-warn"><Icon aria-hidden className="h-4 w-4" /><span className="sr-only">{label}</span></li>;
       })}
     </ul>
   );
@@ -136,36 +137,41 @@ function ListBlock({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-/** Ficha de equipo: lo esencial a la vista (pasos, EPP); el resto en «Detalles». */
+/** Ficha de equipo: ícono, nombre y protección a la vista; los pasos y el detalle se abren al tocar. */
 export function EquipmentCard({ item, need }: { item: EquipmentItem; need?: EquipmentNeed }) {
   const { t } = useLang();
   return (
     <article id={anchor(item.id)} className="flex scroll-mt-20 flex-col gap-2 rounded-xl border border-line bg-panel-2 p-3" data-testid={`equipment-${item.id}`}>
-      <header className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-2">
-          <StationIcon id={item.station} className="mt-0.5 h-5 w-5 shrink-0 text-[#5fb3c9]" />
-          <div>
-            <h3 className="text-[14.5px] font-bold leading-tight">{item.name}</h3>
-            {need && <p className="text-[12px] text-muted">{need.reason}</p>}
-          </div>
+      <header className="flex items-center gap-2.5">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1d3140] text-[#5fd4ef]"><StationIcon id={item.station} className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[14px] font-bold leading-tight">{item.name}</h3>
+          {need && <p className="truncate text-[12px] text-muted" title={need.reason}>{t(need.reason)}</p>}
         </div>
         {need && <Badge tone={NEED_TONE[need.need]}>{NEED_LABEL[need.need]}</Badge>}
       </header>
-      <StepChain steps={item.steps} />
-      <PpeRow item={item} />
-      <ModelButton title={item.name} focus={(c) => equipmentFocus(item.id, c)} testId={`equipment-model-${item.id}`} />
-      <details className="group mt-auto">
+      <div className="flex flex-wrap items-center gap-2">
+        <PpeRow item={item} />
+        <span className="ml-auto"><ModelButton title={item.name} focus={(c) => equipmentFocus(item.id, c)} testId={`equipment-model-${item.id}`} /></span>
+      </div>
+      <details className="group">
         <summary className="cursor-pointer list-none text-[12.5px] font-semibold text-[#bce8f2] [&::-webkit-details-marker]:hidden">
-          <span className="group-open:hidden">Ver detalles ▾</span><span className="hidden group-open:inline">Ocultar detalles ▴</span>
+          <span className="group-open:hidden">Pasos ▾</span><span className="hidden group-open:inline">Ocultar ▴</span>
         </summary>
         <div className="mt-2 grid gap-2.5">
-          <p className="text-[12.5px] text-muted">{item.purpose}</p>
-          <ListBlock title="Con los datos de este proyecto" items={(need?.projectSettings ?? []).map(t)} />
-          <ListBlock title="Puntos críticos" items={item.keySettings} />
-          <ListBlock title="Revisar al terminar" items={item.qualityChecks} />
-          <ListBlock title="Seguridad" items={item.safety} />
-          <ListBlock title="Si no tienes este equipo" items={item.alternatives} />
-          <ListBlock title="Consumibles" items={item.consumables} />
+          <StepChain steps={item.steps} />
+          <details className="group/more">
+            <summary className="cursor-pointer list-none text-[12px] text-muted [&::-webkit-details-marker]:hidden">Más detalle ▾</summary>
+            <div className="mt-2 grid gap-2.5">
+              <p className="text-[12.5px] text-muted">{item.purpose}</p>
+              <ListBlock title="Con los datos de este proyecto" items={(need?.projectSettings ?? []).map(t)} />
+              <ListBlock title="Puntos críticos" items={item.keySettings} />
+              <ListBlock title="Revisar al terminar" items={item.qualityChecks} />
+              <ListBlock title="Seguridad" items={item.safety} />
+              <ListBlock title="Si no tienes este equipo" items={item.alternatives} />
+              <ListBlock title="Consumibles" items={item.consumables} />
+            </div>
+          </details>
         </div>
       </details>
     </article>
@@ -191,7 +197,7 @@ export function EquipmentGrid({ needs }: { needs: EquipmentNeed[] }) {
           );
         })}
       </div>
-      <div className="grid gap-3 md:grid-cols-2">{shown.map((n) => <EquipmentCard key={n.item.id} item={n.item} need={n} />)}</div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{shown.map((n) => <EquipmentCard key={n.item.id} item={n.item} need={n} />)}</div>
     </div>
   );
 }

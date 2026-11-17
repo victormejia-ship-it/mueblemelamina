@@ -35,6 +35,15 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
+/** Etapas del trabajo: cada una agrupa pocas pestañas para no saturar la vista. */
+const GROUPS: { id: string; label: string; icon: typeof Box; tabs: TabId[] }[] = [
+  { id: 'design', label: 'Diseñar', icon: Box, tabs: ['model'] },
+  { id: 'build', label: 'Fabricar', icon: Hammer, tabs: ['parts', 'cut', 'hardware', 'machining', 'assembly', 'workshop'] },
+  { id: 'sell', label: 'Vender', icon: BadgeDollarSign, tabs: ['price', 'quote', 'offers'] },
+  { id: 'deliver', label: 'Entregar', icon: ShieldCheck, tabs: ['qc', 'export', 'history'] },
+];
+const groupOf = (t: TabId) => GROUPS.find((g) => g.tabs.includes(t))!;
+
 export function Editor({ initial }: { initial: Project }) {
   const { t } = useLang();
   const [project, setProject] = useState<Project>(initial);
@@ -44,7 +53,10 @@ export function Editor({ initial }: { initial: Project }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [offers, setOffers] = useState<SupplierOffer[]>([]);
-  const [tab, setTab] = useState<TabId>('model');
+  const [tab, setTabState] = useState<TabId>('model');
+  // Recuerda la última pestaña de cada etapa
+  const lastTab = useRef<Record<string, TabId>>({});
+  const setTab = useCallback((t: TabId) => { lastTab.current[groupOf(t).id] = t; setTabState(t); }, []);
   const [selectedModule, setSelectedModule] = useState<string | null>(initial.modules[0]?.id ?? null);
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const [revisions, setRevisions] = useState<Omit<ProjectRevisionRecord, 'snapshot'>[] | null>(null);
@@ -179,13 +191,28 @@ export function Editor({ initial }: { initial: Project }) {
         </aside>
 
         <Panel className="order-1 min-w-0 lg:order-2">
-          <div role="tablist" aria-label="Secciones del proyecto" className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1 no-print lg:flex-wrap lg:overflow-visible">
-            {TABS.map((t) => (
-              <button key={t.id} id={`tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={`panel-${t.id}`} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`}
-                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12.5px] font-semibold ${tab === t.id ? 'bg-accent text-accent-ink' : 'bg-[#253541] text-[#e5edf3] hover:bg-[#2d4150]'}`}><t.icon aria-hidden className="h-4 w-4" />{t.label}{dot(t.id)}</button>
-            ))}
-          </div>
-          <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+          <nav aria-label="Etapas" className="mb-2 grid grid-cols-4 gap-1.5 no-print">
+            {GROUPS.map((g) => {
+              const active = groupOf(tab).id === g.id;
+              const dots = g.tabs.map((x) => dot(x)).filter(Boolean);
+              return (
+                <button key={g.id} type="button" aria-current={active ? 'step' : undefined} data-testid={`group-${g.id}`}
+                  onClick={() => setTab(lastTab.current[g.id] ?? g.tabs[0]!)}
+                  className={`flex flex-col items-center gap-0.5 rounded-xl px-1 py-2 text-[12.5px] font-bold transition sm:flex-row sm:justify-center sm:gap-2 sm:text-[13.5px] ${active ? 'bg-accent text-accent-ink' : 'bg-[#22313e] text-[#dbe7ef] hover:bg-[#2d4150]'}`}>
+                  <g.icon aria-hidden className="h-5 w-5" /><span className="flex items-center gap-1">{g.label}{dots}</span>
+                </button>
+              );
+            })}
+          </nav>
+          {groupOf(tab).tabs.length > 1 && (
+            <div role="tablist" aria-label="Secciones" className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1 pb-1 no-print">
+              {groupOf(tab).tabs.map((id) => TABS.find((x) => x.id === id)!).map((t) => (
+                <button key={t.id} id={`tab-${t.id}`} role="tab" type="button" aria-selected={tab === t.id} aria-controls={`panel-${t.id}`} onClick={() => setTab(t.id)} data-testid={`tab-${t.id}`}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-semibold ${tab === t.id ? 'bg-[#e5edf3] text-[#10151c]' : 'text-[#c9d6e0] hover:bg-[#22313e]'}`}><t.icon aria-hidden className="h-4 w-4" />{t.label}</button>
+              ))}
+            </div>
+          )}
+          <div role="tabpanel" id={`panel-${tab}`} aria-label={TABS.find((x) => x.id === tab)?.label}>
             {!plan || !calc ? <Alert tone="err">No hay cálculo disponible.</Alert> : (
               <>
                 {tab === 'model' && (

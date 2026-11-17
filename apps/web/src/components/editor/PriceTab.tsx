@@ -33,7 +33,7 @@ function InputCost({ settings, estimatedCents, onChange, disabled }: { settings:
       <div className="flex flex-wrap items-center gap-2">
         <Package aria-hidden className="h-5 w-5 text-[#5fd4ef]" />
         <h2 id="input-cost-title" className="text-[15px] font-bold">Costo de tus insumos</h2>
-        <Hint label="¿Qué incluir?">Todo lo que compras para este mueble: tableros, canto, herrajes, jaladeras, LED, tornillería. Lo demás (mano de obra, renta, luz, herramienta, flete, comisiones, imprevistos y utilidad) lo calcula la app.</Hint>
+        <Hint label="¿Qué incluir?">Todo lo que compras para este mueble: tableros, canto, herrajes, jaladeras, LED, tornillería. Lo demás lo calcula la app. Referencias: {MARKET_REGION}, {MARKET_REFERENCE_DATE}.</Hint>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-3">
         <label className="grid gap-1 text-[12px] font-semibold text-[#aebdcc]">
@@ -54,9 +54,8 @@ function InputCost({ settings, estimatedCents, onChange, disabled }: { settings:
         <label className="flex items-center gap-2 pb-2 text-[13px]"><input type="checkbox" className="!w-auto" checked={settings.inputCostIncludesTax} disabled={disabled} onChange={(ev) => onChange({ inputCostIncludesTax: ev.target.checked })} data-testid="input-cost-tax" />Incluye IVA</label>
       </div>
       <p className="mt-1.5 text-[12px] text-muted">
-        {settings.inputCostCents === null
-          ? <>Sin capturar: se usa lo que estima el despiece, <b className="text-[#e5edf3]">{mxn(estimatedCents)}</b> sin IVA.</>
-          : <>El despiece estima {mxn(estimatedCents)} sin IVA. <button type="button" className="font-semibold text-[#bce8f2] underline" onClick={() => onChange({ inputCostCents: null })} disabled={disabled}>Usar la estimación</button></>}
+        Estimado: <b className="text-[#e5edf3]">{mxn(estimatedCents)}</b>
+        {settings.inputCostCents !== null && <> · <button type="button" className="font-semibold text-[#bce8f2] underline" onClick={() => onChange({ inputCostCents: null })} disabled={disabled}>usar estimado</button></>}
       </p>
     </section>
   );
@@ -149,7 +148,7 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
           {steps.map((s, i) => (
             <li key={s.label} className="grid grid-cols-[14px_1fr_auto_44px] items-center gap-2">
               <span className="h-3 w-3 rounded-sm" style={{ background: s.color }} />
-              <span><b>{i === 0 ? '' : '+ '}{s.label}</b> <span className="text-muted">· {s.note}</span></span>
+              <span title={s.note}><b>{i === 0 ? '' : '+ '}{s.label}</b></span>
               <b className="text-right">{mxn(s.v)}</b>
               <span className="text-right text-muted">{tier.beforeTaxCents ? Math.round((s.v / tier.beforeTaxCents) * 100) : 0} %</span>
             </li>
@@ -166,12 +165,12 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
 
       {/* Salud del precio recomendado */}
       <section data-testid="price-health">
-        <h3 className="mb-1.5 text-[13px] font-bold">¿Es un precio sano? <span className="font-normal text-muted">(precio {e.tiers.find((x) => x.id === e.recommended)!.label.toLowerCase()})</span></h3>
-        <ul className="grid gap-1.5 sm:grid-cols-2">
+        <h3 className="mb-1.5 text-[13px] font-bold">¿Es un precio sano?</h3>
+        <ul className="flex flex-wrap gap-1.5">
           {e.health.map((h) => (
-            <li key={h.id} className={`flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-[12.5px] ${h.ok ? 'bg-ok-bg' : 'bg-warn-bg'}`}>
-              {h.ok ? <CircleCheck aria-hidden className="mt-[1px] h-4 w-4 shrink-0 text-ok" /> : <TriangleAlert aria-hidden className="mt-[1px] h-4 w-4 shrink-0 text-warn" />}
-              <span><b>{h.label}.</b> <span className="text-muted">{h.detail}</span></span>
+            <li key={h.id} title={h.detail} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold ${h.ok ? 'bg-ok-bg text-ok' : 'bg-warn-bg text-warn'}`}>
+              {h.ok ? <CircleCheck aria-hidden className="h-4 w-4 shrink-0" /> : <TriangleAlert aria-hidden className="h-4 w-4 shrink-0" />}
+              {h.label}<span className="sr-only">: {h.detail}</span>
             </li>
           ))}
         </ul>
@@ -197,10 +196,13 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
         </section>
       )}
 
-      <ul className="grid gap-1.5" aria-label="Recomendaciones">
-        {e.advice.map((a) => <li key={a} className="rounded-lg bg-[#162a36] px-3 py-1.5 text-[12.5px]">{a}</li>)}
-        {e.inputSource === 'estimado' && e.unpriced.length > 0 && <li className="rounded-lg bg-err-bg px-3 py-1.5 text-[12.5px] text-err">Sin precio en la estimación: {e.unpriced.join(', ')}</li>}
-      </ul>
+      {e.advice[0] && <p className="rounded-lg bg-[#162a36] px-3 py-2 text-[13px] font-semibold" data-testid="price-advice">{e.advice[0]}</p>}
+      {e.advice.length > 1 && (
+        <More summary={`Consejos · ${e.advice.length - 1}`}>
+          <ul className="grid gap-1.5 text-[12.5px]">{e.advice.slice(1).map((a) => <li key={a}>• {a}</li>)}</ul>
+        </More>
+      )}
+      {e.inputSource === 'estimado' && e.unpriced.length > 0 && <p className="rounded-lg bg-err-bg px-3 py-1.5 text-[12.5px] text-err">Sin precio: {e.unpriced.join(', ')}</p>}
 
       <More summary={<>Mano de obra <span className="text-[12px] font-normal text-muted">{mxn(t.laborCents)} · {e.labor.reduce((s, l) => s + l.hours, 0).toFixed(1)} h</span></>}>
         <table className="w-full text-[12.5px]">
@@ -271,7 +273,6 @@ export function PriceTab({ plan, project, onPricing, readOnly }: { plan: Manufac
         </fieldset>
         <p className="mt-2 text-[11.5px] text-muted">Valores de un taller sano en {MARKET_REGION}: utilidad neta 15–25 %, indirectos 15–25 %, imprevistos 5 %. Ajústalos a tus números reales.</p>
       </More>
-      <p className="text-[11.5px] text-muted">Rangos de mercado y precios de referencia: {MARKET_REGION}, {MARKET_REFERENCE_DATE}, sin IVA. Son un punto de partida; confirma con tus proveedores.</p>
     </div>
   );
 }

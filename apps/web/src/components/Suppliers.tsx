@@ -69,19 +69,23 @@ export function Suppliers() {
 
   return (
     <div className="mx-auto grid max-w-7xl gap-4">
-      <Panel title="Proveedores prioritarios">
-        <p className="mb-3 text-[12.5px] text-muted">Sin afiliación, certificación ni colaboración comercial. Prioridad de integración: API autorizada &gt; catálogo CSV/XLSX entregado &gt; captura de cotización &gt; consulta manual a web pública con registro de fuente y fecha. No se hace scraping.</p>
-        <div className="grid gap-3 md:grid-cols-3">
-          {SUPPLIERS.map((s) => (
-            <article key={s.id} className="rounded-xl border border-line bg-panel-2 p-3 text-[12.5px]">
-              <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{s.name}</h3><Badge tone={s.verification === 'PUBLIC_CATALOG' ? 'info' : 'warn'}>{s.verification === 'PUBLIC_CATALOG' ? 'Catálogo público' : 'URL por verificar'}</Badge></div>
-              <p className="mt-1 text-muted">{s.notes}</p>
-              <p className="mt-1">Categorías: {s.categories.join(', ')}</p>
-              {s.officialUrl && <p>Oficial: <a className="text-[#bce8f2] underline" href={s.officialUrl} target="_blank" rel="noreferrer noopener">{s.officialUrl}</a></p>}
-              {s.candidateUrl && <p>Candidata (sin verificar): <span className="text-muted">{s.candidateUrl}</span></p>}
-              <p className="mt-1">Ofertas registradas: {(offers ?? []).filter((o) => o.supplierId === s.id).length}</p>
-            </article>
-          ))}
+      <Panel title={<span className="flex items-center gap-2">Proveedores <Hint>Sin afiliación ni colaboración comercial. Los precios se capturan o se importan en CSV; no se hace scraping.</Hint></span>}>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {SUPPLIERS.map((s) => {
+            const n = (offers ?? []).filter((o) => o.supplierId === s.id).length;
+            const url = s.officialUrl ?? s.candidateUrl;
+            return (
+              <article key={s.id} className="flex items-center gap-2.5 rounded-xl border border-line bg-panel-2 p-2.5 text-[12.5px]" title={s.notes}>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#1d3140] text-[15px] font-bold text-[#5fd4ef]">{s.name.slice(0, 1)}</span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate font-semibold">{s.name}</h3>
+                  <p className="truncate text-muted">{s.categories.join(' · ')}</p>
+                </div>
+                <Badge tone={n ? 'ok' : 'neutral'}>{n} precio{n === 1 ? '' : 's'}</Badge>
+                {url && <a href={url} target="_blank" rel="noreferrer noopener" aria-label={`Sitio de ${s.name}`} className="text-[#bce8f2]">↗</a>}
+              </article>
+            );
+          })}
         </div>
       </Panel>
 

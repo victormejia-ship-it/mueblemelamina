@@ -4,7 +4,7 @@ import { DEFAULT_CATALOG, STEEL_FINISH_ES, assemblySteps, catalogLookup, hwCateg
 import { useLang } from '@/lib/lang';
 import { assemblyGuide, cutPlanSvg } from '@ms/geometry';
 import { saveBlob } from '@/lib/data/exports';
-import { Alert, Badge, Button, EmptyState, Hint, More, Stat } from '../ui';
+import { Alert, Badge, BigStat, Button, EmptyState, Hint, More, Stat } from '../ui';
 import { NumberInput } from './inputs';
 
 const L = catalogLookup(DEFAULT_CATALOG);
@@ -22,7 +22,7 @@ export function PartsTab({ plan, selected, onSelect }: { plan: ManufacturingPlan
         <Stat label="Modelos de corte" value={calc.totals.partModels} />
         <Stat label="Área de tablero" value={`${calc.totals.panelAreaM2} m²`} />
         <Stat label="Peso de tableros" value={`${Math.round(calc.modules.reduce((s, m) => s + m.weightKg, 0) * 10) / 10} kg`} />
-        {calc.edgeBands.map((e) => <Stat key={e.edgeBandId} label={`Canto ${L.edgeBand(e.edgeBandId).name}`} value={`${(e.netLengthMm / 1000).toFixed(2)} m neto · ${(e.purchaseLengthMm / 1000).toFixed(2)} m compra`} />)}
+        {calc.edgeBands.map((e) => <Stat key={e.edgeBandId} label={L.edgeBand(e.edgeBandId).name} value={`${(e.netLengthMm / 1000).toFixed(2)} m neto · ${(e.purchaseLengthMm / 1000).toFixed(2)} m compra`} />)}
       </div>
       <div className="max-h-[560px] overflow-auto">
         <table data-testid="parts-table">
@@ -108,18 +108,17 @@ export function HardwareTab({ plan }: { plan: ManufacturingPlan }) {
 export function MachiningTab({ plan }: { plan: ManufacturingPlan }) {
   const { t, lang } = useLang();
   const ops = plan.calc.machining;
-  const pending = ops.filter((o) => o.validationStatus !== 'verified').length;
+  const qty = new Map(plan.calc.parts.map((p) => [p.id, p.quantity]));
+  const pending = ops.filter((o) => o.validationStatus !== 'verified').reduce((n, o) => n + (qty.get(o.partId) ?? 1), 0);
+  const byPattern: Record<string, number> = {};
+  for (const o of ops) byPattern[o.patternId] = (byPattern[o.patternId] ?? 0) + (qty.get(o.partId) ?? 1);
   return (
     <div className="grid gap-3">
-      <Alert tone={pending ? 'warn' : 'ok'}>{ops.length} operaciones; {pending} pendientes de ficha técnica. Las operaciones pendientes no tienen coordenadas: no se afirman cotas sin ficha del fabricante.</Alert>
-      <div className="grid gap-2 md:grid-cols-2">
-        {DEFAULT_CATALOG.machiningPatterns.map((p) => (
-          <div key={p.id} className="rounded-xl border border-line bg-panel-2 p-3 text-[12.5px]">
-            <div className="flex justify-between gap-2"><span className="font-semibold">{p.name}</span><Badge tone={vTone(p.validationStatus)}>{vLabel[p.validationStatus]}</Badge></div>
-            <p className="text-muted">Ficha: {p.technicalDatasheetUrl ?? 'no asociada'} · barrenos definidos: {p.holes.length} · remanente mínimo {p.minRemainingMm} mm</p>
-          </div>
-        ))}
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(byPattern).map(([id, n]) => <BigStat key={id} value={n} label={patternLabel(id, lang)} />)}
+        <BigStat value={pending} label="pendientes de ficha" tone={pending ? 'warn' : 'ok'} />
       </div>
+      <More summary={`Lista de operaciones · ${ops.length}`}>
       <div className="max-h-[420px] overflow-auto">
         <table>
           <thead><tr><th>ID</th><th>Pieza</th><th>Patrón</th><th className="num">X</th><th className="num">Y</th><th className="num">Ø</th><th className="num">Prof.</th><th>Estado</th><th>Descripción</th></tr></thead>
@@ -128,7 +127,8 @@ export function MachiningTab({ plan }: { plan: ManufacturingPlan }) {
           ))}</tbody>
         </table>
       </div>
-      <Hint>Las coordenadas de cada barreno se generan cuando el patrón del herraje se captura desde su ficha técnica y queda verificado. El motor revisa que la broca no salga por la otra cara y que los barrenos no se encimen. No se generan programas CNC.</Hint>
+      </More>
+      <Hint>Sin ficha técnica del herraje no hay coordenadas: no perfores esas operaciones. No se generan programas CNC.</Hint>
     </div>
   );
 }

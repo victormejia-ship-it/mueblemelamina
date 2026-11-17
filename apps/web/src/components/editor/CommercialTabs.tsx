@@ -10,6 +10,7 @@ import { useLang } from '@/lib/lang';
 import { IS_FIREBASE, getDataClient, type ExportFormat } from '@/lib/data';
 import { Alert, Badge, BigStat, Button, EmptyState, Hint, More, Stat, quoteTone, releaseLabel, releaseTone, severityLabel, severityTone } from '../ui';
 import { CircleCheck, CircleX, TriangleAlert } from '../icons';
+import { Box, FileText, Route, Scissors, Table2, Wrench } from 'lucide-react';
 import { PRICE_STATUS_TONE } from '../Suppliers';
 import { MoneyInput, NumberInput, SelectInput } from './inputs';
 
@@ -18,19 +19,32 @@ const supplierName = (id: string | null) => SUPPLIERS.find((s) => s.id === id)?.
 export function OffersTab({ plan, project, offers, today, onPricing }: { plan: ManufacturingPlan; project: Project; offers: SupplierOffer[]; today: string; onPricing: (p: PricingSettings) => void }) {
   const p = project.pricing;
   const lines = plan.quote.lines.filter((l) => l.category !== 'service');
+  const hasOffers = (key: string) => offers.some((o) => o.productKey === key);
+  const withOffers = lines.filter((l) => hasOffers(l.key));
+  const without = lines.filter((l) => !hasOffers(l.key));
   return (
     <div className="grid gap-3">
-      <label className="flex items-center gap-2 text-[13px]">
-        <input type="checkbox" checked={p.allowEstimatedPrices} onChange={(e) => onPricing({ ...p, allowEstimatedPrices: e.target.checked })} data-testid="allow-estimates" />
-        Permitir precios ESTIMADOS en selección automática (la cotización quedará como SIMULACIÓN)
-      </label>
-      {lines.map((l) => {
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2 text-[13px]">
+          <input type="checkbox" checked={p.allowEstimatedPrices} onChange={(e) => onPricing({ ...p, allowEstimatedPrices: e.target.checked })} data-testid="allow-estimates" />
+          Usar precios estimados
+        </label>
+        <Hint>Con precios estimados la cotización queda como simulación. Se compara por clave de producto, en neto sin IVA, y la compra se redondea a presentaciones completas.</Hint>
+      </div>
+      {without.length > 0 && (
+        <p className="flex flex-wrap items-center gap-1.5 text-[12.5px] text-muted">
+          <span className="font-semibold text-warn">Sin ofertas ({without.length}):</span>
+          {without.map((l) => <span key={l.key} className="rounded-full bg-[#22313e] px-2 py-0.5" data-testid={`req-${l.key}`}>{l.description}</span>)}
+          <a href="/proveedores" className="font-semibold text-[#bce8f2] underline">Agregar precios</a>
+        </p>
+      )}
+      {withOffers.map((l) => {
         const evals = evaluateOffers({ key: l.key, quantity: l.requiredQuantity }, offers, today, p.allowEstimatedPrices);
         const sel = p.selectedOffers[l.key] ?? '';
         return (
           <section key={l.key} className="rounded-xl border border-line p-3" data-testid={`req-${l.key}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div><span className="font-semibold">{l.description}</span> <span className="text-muted">· {l.requiredQuantity} {l.requiredUnit} · <code className="text-[11px]">{l.key}</code></span></div>
+              <div><span className="font-semibold">{l.description}</span> <span className="text-muted">· {l.requiredQuantity} {l.requiredUnit}</span></div>
               <Badge tone={l.status === 'PRICED' ? 'ok' : l.status === 'ESTIMATED' ? 'info' : 'warn'}>{l.status === 'PRICED' ? `${formatMXN(l.lineNetCents)} neto` : l.status === 'ESTIMATED' ? `Estimado ${formatMXN(l.lineNetCents)}` : 'Precio pendiente'}</Badge>
             </div>
             {evals.length === 0 ? <p className="mt-1 text-[12px] text-muted">Sin ofertas para esta clave. Registre una cotización en «Proveedores y precios».</p> : (
@@ -39,7 +53,7 @@ export function OffersTab({ plan, project, offers, today, onPricing }: { plan: M
                 <table>
                   <thead><tr><th></th><th>Proveedor</th><th>SKU</th><th className="num">Presentación</th><th className="num">Neto/presentación</th><th className="num">Compra</th><th className="num">Costo aterrizado</th><th>Estado</th><th>Motivo</th></tr></thead>
                   <tbody>
-                    <tr><td><input type="radio" name={`sel-${l.key}`} checked={sel === ''} onChange={() => { const s = { ...p.selectedOffers }; delete s[l.key]; onPricing({ ...p, selectedOffers: s }); }} aria-label="Selección automática" /></td><td colSpan={8} className="text-muted">Automático: la oferta utilizable de menor costo neto</td></tr>
+                    <tr><td><input type="radio" name={`sel-${l.key}`} checked={sel === ''} onChange={() => { const s = { ...p.selectedOffers }; delete s[l.key]; onPricing({ ...p, selectedOffers: s }); }} aria-label="Selección automática" /></td><td colSpan={8} className="text-muted">Automático (la más barata)</td></tr>
                     {evals.map((e) => (
                       <tr key={e.offer.id} className={e.usable ? '' : 'opacity-70'}>
                         <td><input type="radio" name={`sel-${l.key}`} checked={sel === e.offer.id} onChange={() => onPricing({ ...p, selectedOffers: { ...p.selectedOffers, [l.key]: e.offer.id } })} aria-label={`Elegir ${e.offer.sku} de ${supplierName(e.offer.supplierId)}`} data-testid={`offer-${e.offer.id}`} /></td>
@@ -56,7 +70,6 @@ export function OffersTab({ plan, project, offers, today, onPricing }: { plan: M
           </section>
         );
       })}
-      <Hint>Comparación por clave de producto equivalente (misma especificación). Precios normalizados a neto sin IVA según «IVA incluido/excluido»; la compra se redondea a presentaciones completas. Flete y disponibilidad: registrar en notas de la oferta o como costo manual.</Hint>
     </div>
   );
 }
@@ -223,47 +236,46 @@ export function ExportTab({ project, dirty, onSave, revisionId }: { project: Pro
   const { lang } = useLang();
   const [sep, setSep] = useState<',' | ';'>(';');
   const [msg, setMsg] = useState<string | null>(null);
-  const [render, setRender] = useState<string | null>(null);
   const run = async (format: string, extra: Record<string, unknown> = {}) => {
     setMsg(null);
     if (dirty && !revisionId && !(await onSave())) return;
     try { setMsg(`Descargado: ${await (await getDataClient()).exportProject(project.id, format as ExportFormat, { revisionId, separator: sep, lang, ...extra })}`); } catch (e) { setMsg(errorMessage(e)); }
   };
-  const items: { f: string; label: string; desc: string; extra?: Record<string, unknown> }[] = [
-    { f: 'pdf', label: 'PDF de fabricación', desc: 'Expediente: isométrico, despiece, tableros, herrajes, incidencias, presupuesto, armado y QC.' },
-    { f: 'parts-csv', label: 'Despiece CSV', desc: 'UTF-8 con BOM; IDs, medida final y de corte, veta, cantos, material, estado.' },
-    { f: 'quote-csv', label: 'Cotización CSV', desc: 'Líneas con proveedor, SKU, fecha, estado de precio y totales.' },
-    { f: 'hardware-csv', label: 'Herrajes y herrería CSV', desc: 'Requerimientos con regla aplicada y validación.' },
-    { f: 'checks-csv', label: 'Verificación dimensional CSV', desc: 'Cada comprobación con valor esperado, calculado y resultado.' },
-    { f: 'route-svg', label: 'Ruta de taller (SVG)', desc: 'Diagrama de estaciones con equipo, cifras y avisos del proyecto.' },
-    { f: 'tools-csv', label: 'Herramientas y equipo CSV', desc: 'Equipo por estación con necesidad, ajustes, pasos, seguridad y control.' },
-    { f: 'json', label: 'JSON versionado', desc: 'Proyecto + cálculo + acomodo + cotización (schemaVersion, calcVersion).' },
-    { f: 'svg', label: 'SVG isométrico', desc: 'Vector con cotas en mm e IDs de pieza.' },
-    { f: 'svg', label: 'SVG despiece separado', desc: 'Piezas separadas con etiquetas.', extra: { exploded: true } },
-    { f: 'cut-svg', label: 'SVG plan de corte', desc: 'Todos los tableros en un solo diagrama, con piezas numeradas y sobrantes.' },
-    { f: 'mermaid', label: 'Mermaid (.mmd)', desc: 'Diagrama de dependencias de armado.' },
+  type Item = { f: string; label: string; desc: string; icon: typeof FileText; extra?: Record<string, unknown> };
+  const main: Item[] = [
+    { f: 'pdf', label: 'Expediente PDF', icon: FileText, desc: 'Isométrico, despiece, tableros, herrajes, incidencias, presupuesto, armado y calidad.' },
+    { f: 'cut-svg', label: 'Plan de corte', icon: Scissors, desc: 'Todos los tableros en un solo diagrama, con piezas numeradas y sobrantes.' },
+    { f: 'parts-csv', label: 'Despiece', icon: Table2, desc: 'CSV con medida final y de corte, veta, cantos y material.' },
+    { f: 'hardware-csv', label: 'Herrajes', icon: Wrench, desc: 'CSV de herrajes y herrería con la regla aplicada.' },
+    { f: 'route-svg', label: 'Ruta de taller', icon: Route, desc: 'Diagrama de estaciones con equipo, cifras y avisos.' },
+    { f: 'svg', label: 'Dibujo', icon: Box, desc: 'Isométrico con cotas en mm.' },
   ];
+  const tech: Item[] = [
+    { f: 'quote-csv', label: 'Cotización CSV', icon: Table2, desc: 'Líneas con proveedor, SKU, estado de precio y totales.' },
+    { f: 'checks-csv', label: 'Verificación CSV', icon: Table2, desc: 'Cada comprobación con esperado, calculado y resultado.' },
+    { f: 'tools-csv', label: 'Herramientas CSV', icon: Table2, desc: 'Equipo por estación con ajustes, pasos y seguridad.' },
+    { f: 'svg', label: 'Despiece separado', icon: Box, desc: 'Piezas separadas con etiquetas.', extra: { exploded: true } },
+    { f: 'mermaid', label: 'Mermaid', icon: FileText, desc: 'Diagrama de dependencias de armado.' },
+    { f: 'json', label: 'Respaldo JSON', icon: FileText, desc: 'Proyecto + cálculo para reimportar.' },
+  ];
+  const tile = (it: Item) => (
+    <button key={it.label} type="button" title={it.desc} onClick={() => run(it.f, it.extra)} data-testid={`export-${it.f}${it.extra ? '-x' : ''}`}
+      className="flex flex-col items-center gap-1.5 rounded-xl border border-line bg-panel-2 px-2 py-3 text-[12.5px] font-semibold hover:border-accent">
+      <it.icon aria-hidden className="h-6 w-6 text-[#5fd4ef]" />{it.label}
+    </button>
+  );
   return (
     <div className="grid gap-3">
       {revisionId && <Alert tone="info">Exportando la revisión {revisionId} (congelada).</Alert>}
       {dirty && !revisionId && <Alert tone="warn">Se guardará antes de exportar.</Alert>}
-      <div className="max-w-xs"><SelectInput label="Separador CSV" value={sep} onChange={setSep} options={[{ value: ';', label: '; (Excel es-MX, coma decimal)' }, { value: ',', label: ', (estándar, punto decimal)' }]} testId="csv-sep" /></div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((it) => (
-          <div key={it.label} className="flex flex-col gap-1 rounded-xl border border-line bg-panel-2 p-3">
-            <span className="font-semibold">{it.label}</span><span className="text-[12px] text-muted">{it.desc}</span>
-            <Button className="mt-auto self-start" variant="secondary" onClick={() => run(it.f, it.extra)} data-testid={`export-${it.f}${it.extra ? '-x' : ''}`}>Descargar</Button>
-          </div>
-        ))}
-      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">{main.map(tile)}</div>
+      <More summary="Archivos técnicos">
+        <div className="grid gap-3">
+          <div className="max-w-xs"><SelectInput label="Separador CSV" value={sep} onChange={setSep} options={[{ value: ';', label: '; (Excel es-MX)' }, { value: ',', label: ', (estándar)' }]} testId="csv-sep" /></div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">{tech.map(tile)}</div>
+        </div>
+      </More>
       {msg && <p role="status" className="text-[12.5px]" data-testid="export-msg">{msg}</p>}
-      <Hint>DXF y DWG no están implementados (no se prometen). Programas CNC: fuera de alcance hasta contar con posprocesador homologado.</Hint>
-      {!IS_FIREBASE && <section className="rounded-xl border border-line p-3">
-        <h3 className="font-semibold">Render fotorrealista (opcional)</h3>
-        <Hint>Requiere un servicio externo configurado en el servidor. Un render nunca sustituye planos ni despiece.</Hint>
-        <Button className="mt-2" variant="secondary" onClick={async () => { const r = await api<{ status: string; disclaimer: string }>('/api/render', { method: 'POST', json: { projectId: project.id, moduleId: project.modules[0]?.id, kind: 'inspiracion_visual' } }); setRender(`${r.status}: ${r.disclaimer}`); }}>Solicitar render de inspiración</Button>
-        {render && <p className="mt-1 text-[12px]">{render}</p>}
-      </section>}
     </div>
   );
 }
