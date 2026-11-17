@@ -300,7 +300,7 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
       <div ref={host} className="relative min-h-[300px] overflow-hidden rounded-xl bg-[#e9e6e0]">
         {!ready && <div className="absolute inset-0 flex items-center justify-center text-[13px] text-[#55636f]">Preparando render…</div>}
       </div>
-      <p className="text-[12px] text-muted">Arrastra para girar · pellizca o rueda para acercar. {finish ? 'El acabado de prueba no cambia el proyecto.' : ''} Jaladeras ilustrativas.{rm.wallMounted ? ' Aéreos a 1450 mm del piso (referencia).' : ''}</p>
+      <p className="text-[12px] text-muted">Arrastra para girar · pellizca o rueda para acercar. {finish ? 'El acabado de prueba no cambia el proyecto.' : ''} Jaladeras ilustrativas.{rm.wallMounted ? ' Muebles a muro a altura de referencia (aéreos de cocina 1450 mm, flotantes 450 mm).' : ''}</p>
     </div>
   );
 }

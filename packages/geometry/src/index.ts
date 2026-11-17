@@ -3,7 +3,7 @@
  * Nunca altera el BOM: cada polígono proviene de una pieza con su ID.
  * Es un esquema axonométrico/ortogonal 2D, NO un modelo CAD 3D ni un plano CNC.
  */
-import { catalogLookup, type Box3, type Catalog, type ModelFocus, type PanelPart, type Project, type ProjectCalculation } from '@ms/domain';
+import { catalogLookup, partCodeLabel, type Box3, type CodeLang, type Catalog, type ModelFocus, type PanelPart, type Project, type ProjectCalculation } from '@ms/domain';
 
 export type ViewKind = 'iso' | 'front' | 'side' | 'top';
 
@@ -23,6 +23,8 @@ export interface SceneOptions {
   noTitle?: boolean;
   /** Enfoque de una herramienta: resalta piezas, cantos y diagonales y atenúa el resto. */
   focus?: Pick<ModelFocus, 'partIds' | 'edges' | 'diagonals' | 'labels' | 'led'> | null;
+  /** Idioma de los códigos de pieza en las etiquetas (español por defecto). */
+  lang?: CodeLang;
 }
 
 export type Pt = [number, number];
@@ -166,6 +168,52 @@ function steelSolids(project: Project, calc: ProjectCalculation): Solid[] {
       const zt = leg.lengthMm;
       out.push({ key: `${req.id}-RF`, partId: req.id, moduleId: m.moduleId, role: 'steel', b: { x0: inset + sec, x1: W - inset - sec, y0: ys[0]!, y1: ys[0]! + sec, z0: zt - sec, z1: zt } });
       out.push({ key: `${req.id}-RB`, partId: req.id, moduleId: m.moduleId, role: 'steel', b: { x0: inset + sec, x1: W - inset - sec, y0: ys[1]!, y1: ys[1]! + sec, z0: zt - sec, z1: zt } });
+    }
+  }
+  return out;
+}
+
+function inPoly(p: Pt, poly: Pt[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]!, [xj, yj] = poly[j]!;
+    if ((yi > p[1]) !== (yj > p[1]) && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const polyArea = (pts: Pt[]) => Math.abs(pts.reduce((a, p, i) => { const q = pts[(i + 1) % pts.length]!; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+
+/**
+ * Etiquetas de ID legibles: una por pieza visible, sobre su cara más grande que se ve.
+ * Se omiten las piezas tapadas por otras (p. ej. costados detrás de los frentes) y las que se encimarían con otra etiqueta.
+ */
+function idLabels(ordered: Solid[], polys: { key: string; pts: Pt[] }[], partsById: Map<string, PanelPart>, taken: SceneLabel[], lang: CodeLang): SceneLabel[] {
+  const out: SceneLabel[] = [];
+  const box = (x: number, y: number, text: string) => { const w = text.length * 6.1 + 6; return { x0: x - w / 2, x1: x + w / 2, y0: y - 9, y1: y + 5 }; };
+  const boxes = taken.map((l) => box(l.x, l.y, l.text));
+  const idx = new Map<string, number[]>();
+  polys.forEach((p, i) => idx.set(p.key, [...(idx.get(p.key) ?? []), i]));
+  const seenSteel = new Set<string>();
+  // Del frente hacia atrás: lo visible se etiqueta primero.
+  for (let k = ordered.length - 1; k >= 0; k--) {
+    const s = ordered[k]!;
+    if (s.role === 'steel') { if (seenSteel.has(s.partId)) continue; seenSteel.add(s.partId); }
+    const own = (idx.get(s.key) ?? []).map((i) => ({ i, a: polyArea(polys[i]!.pts) })).sort((a, b) => b.a - a.a);
+    const part = partsById.get(s.partId);
+    const text = part ? `${partCodeLabel(part.code, lang)}${part.quantity > 1 ? `·${s.key.split('#')[1]}` : ''}` : 'PTR';
+    for (const { i, a } of own) {
+      const pts = polys[i]!.pts;
+      // Caras delgadas (cantos): grosor ≈ 2·área/perímetro; si no cabe el texto, no llevan etiqueta.
+      const per = pts.reduce((t, p, k) => { const q = pts[(k + 1) % pts.length]!; return t + Math.hypot(q[0] - p[0], q[1] - p[1]); }, 0);
+      if (a < 600 || (2 * a) / per < 12) continue;
+      const c: Pt = [pts.reduce((t, p) => t + p[0], 0) / pts.length, pts.reduce((t, p) => t + p[1], 0) / pts.length];
+      const hidden = polys.some((q, j) => j > i && q.key !== s.key && inPoly(c, q.pts));
+      if (hidden) continue;
+      const bb = box(c[0], c[1], text);
+      if (boxes.some((o) => bb.x0 < o.x1 && bb.x1 > o.x0 && bb.y0 < o.y1 && bb.y1 > o.y0)) continue;
+      boxes.push(bb);
+      out.push({ x: Math.round(c[0] * 10) / 10, y: Math.round((c[1] + 3) * 10) / 10, text, kind: 'id', anchor: 'middle' });
+      break;
     }
   }
   return out;
@@ -324,17 +372,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     const p = T(project3(view, ...l.p));
     labels.push({ x: p[0], y: p[1], text: l.text, kind: 'focus', anchor: 'middle' });
   }
-  if (opts.showIds) {
-    const seen = new Set<string>();
-    for (const s of ordered) {
-      if (s.role === 'steel' && seen.has(s.partId)) continue;
-      seen.add(s.partId);
-      const c = project3(view, (s.b.x0 + s.b.x1) / 2, view === 'front' ? s.b.y0 : (s.b.y0 + s.b.y1) / 2, (s.b.z0 + s.b.z1) / 2);
-      const p = T(c);
-      const part = partsById.get(s.partId);
-      labels.push({ x: p[0], y: p[1], text: part ? `${part.code}${part.quantity > 1 ? `·${s.key.split('#')[1]}` : ''}` : 'PTR', kind: 'id', anchor: 'middle' });
-    }
-  }
+  if (opts.showIds) labels.push(...idLabels(ordered, rawPolys.map((r) => ({ key: r.s.key, pts: r.pts.map(T) })), partsById, [...labels], opts.lang ?? 'es'));
   if (!opts.minimal && !opts.noTitle) labels.unshift(
     { x: 24, y: 34, text: opts.title ?? project.name, kind: 'title', anchor: 'start' },
     { x: 24, y: 56, text: `${({ iso: 'Isométrico', front: 'Vista frontal', side: 'Vista lateral derecha', top: 'Planta' } as const)[view]} esquemático · cotas en mm${opts.exploded ? ' · despiece separado' : ''}`, kind: 'subtitle', anchor: 'start' },

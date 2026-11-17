@@ -5,15 +5,17 @@ import { DEFAULT_CATALOG, type ModelFocus, type ProjectCalculation, type Project
 import { buildScene, sceneToSvg, type ViewKind } from '@ms/geometry';
 import { Download, EyeOff, Hash, Layers, Sparkles } from 'lucide-react';
 import { Hint } from '../ui';
+import { useLang } from '@/lib/lang';
 
 const RenderView = dynamic(() => import('./RenderView'), { ssr: false, loading: () => <div className="flex min-h-[300px] items-center justify-center rounded-xl bg-[#e9e6e0] text-[13px] text-[#55636f]">Preparando render…</div> });
 
 export function Viewer({ project, calc, selected, onSelect, focus = null }: { project: Project; calc: ProjectCalculation; selected: string | null; onSelect: (id: string | null) => void; focus?: ModelFocus | null }) {
+  const { t, lang } = useLang();
   const [view, setView] = useState<ViewKind | 'render'>('iso');
   const [exploded, setExploded] = useState(false);
   const [showIds, setShowIds] = useState(false);
   const [hideFronts, setHideFronts] = useState(false);
-  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view: view === 'render' ? 'iso' : view, exploded, showIds, hideFronts, selectedPartId: selected, noTitle: true, focus }), [project, calc, view, exploded, showIds, hideFronts, selected, focus]);
+  const scene = useMemo(() => buildScene(project, calc, DEFAULT_CATALOG, { view: view === 'render' ? 'iso' : view, exploded, showIds, hideFronts, selectedPartId: selected, noTitle: true, focus, lang }), [project, calc, view, exploded, showIds, hideFronts, selected, focus, lang]);
   const views: { v: ViewKind; label: string }[] = [{ v: 'iso', label: 'Isométrico' }, { v: 'front', label: 'Frente' }, { v: 'side', label: 'Lateral' }, { v: 'top', label: 'Planta' }];
 
   function downloadSvg() {
@@ -53,7 +55,7 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
           {scene.polygons.map((p) => (
             <polygon key={p.key} data-part-id={p.partId} points={p.points.map((x) => x.join(',')).join(' ')} fill={p.fill} stroke={p.stroke} strokeWidth={p.selected ? 2.4 : 1} strokeLinejoin="round" opacity={p.dim ? 0.18 : 1}
               className="cursor-pointer" onClick={() => onSelect(p.partId === selected ? null : p.partId)}>
-              <title>{p.partId}</title>
+              <title>{t(p.partId)}</title>
             </polygon>
           ))}
           {scene.lines.map((l, i) => l.kind === 'edge' ? <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#ff9f43" strokeWidth={3} strokeLinecap="round" data-kind="edge" />
@@ -69,7 +71,7 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
         </svg>
       </div>
       </>}
-      {view !== 'render' && <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {selected}</span>}{calc.ledRuns.length > 0 && <span className="flex items-center gap-1 rounded-full bg-[#2b3a24] px-2 py-0.5 font-semibold text-[#ffe27a]" data-testid="led-legend"><span className="h-[3px] w-4 rounded bg-[#ffd84d]" />Ranura LED (router) · {calc.ledRuns.length}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un plano CNC. Para ver cómo se vería, usa «Render».</Hint></div>}
+      {view !== 'render' && <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {t(selected)}</span>}{calc.ledRuns.length > 0 && <span className="flex items-center gap-1 rounded-full bg-[#2b3a24] px-2 py-0.5 font-semibold text-[#ffe27a]" data-testid="led-legend"><span className="h-[3px] w-4 rounded bg-[#ffd84d]" />Ranura LED (router) · {calc.ledRuns.length}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un plano CNC. Para ver cómo se vería, usa «Render».</Hint></div>}
     </div>
   );
 }

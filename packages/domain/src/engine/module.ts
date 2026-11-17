@@ -23,7 +23,45 @@ export const ENGINE_DEFAULTS = {
   deskMaxModestyMm: 280,
   deskMinKneeClearanceMm: 620,
   deskMinLegroomWidthMm: 600,
+  /** Alto del frente de cada cajón superior en «cajón + puertas». */
+  topDrawerFrontMm: 160,
+  /** Alto mínimo de puerta bajo los cajones. */
+  minDoorUnderDrawerMm: 200,
+  /** En cajones graduados, cada cajón hacia abajo es esta fracción más alto que el de arriba. */
+  graduatedStep: 0.25,
 };
+
+export interface FrontZone { z0: number; h: number }
+
+/**
+ * Reparto vertical de frentes: cajones (iguales o graduados) y, en «cajón + puertas», la zona de puertas
+ * y el travesaño fijo que separa ambas. Alturas exactas: frentes + juntas = alto − 2 holguras.
+ */
+export function frontLayout(spec: ModuleSpec, zb: number): { drawers: FrontZone[]; door: FrontZone | null; railZ: number | null } {
+  const r = spec.revealMm, g = spec.frontGapMm;
+  const avail = spec.heightMm - 2 * r;
+  if (spec.front === 'drawer_doors') {
+    const n = Math.min(3, Math.max(1, Math.round(spec.drawerCount || 1)));
+    const fh = ENGINE_DEFAULTS.topDrawerFrontMm;
+    const dh = r2(avail - n * (fh + g));
+    if (dh < ENGINE_DEFAULTS.minDoorUnderDrawerMm) throw new ModuleInputError('DOOR_UNDER_DRAWER_TOO_LOW', `Quedan ${dh} mm para puertas bajo ${n} cajón(es) de ${fh} mm: aumente el alto o quite cajones.`);
+    const door = { z0: zb + r, h: dh };
+    const drawers = Array.from({ length: n }, (_, i) => ({ z0: r2(zb + r + dh + g + i * (fh + g)), h: fh }));
+    return { drawers, door, railZ: r2(zb + r + dh + g / 2) };
+  }
+  if (spec.front !== 'drawers') return { drawers: [], door: spec.front === 'doors' ? { z0: zb + r, h: avail } : null, railZ: null };
+  const n = Math.max(1, Math.round(spec.drawerCount));
+  const free = avail - (n - 1) * g;
+  // i = 0 es el de abajo (el más alto si son graduados).
+  const w = Array.from({ length: n }, (_, i) => (spec.drawerLayout === 'graduated' ? 1 + ENGINE_DEFAULTS.graduatedStep * (n - 1 - i) : 1));
+  const sum = w.reduce((a, b) => a + b, 0);
+  // Graduados: milímetros enteros (más fácil de cortar y medir); el de arriba absorbe el residuo.
+  const hs = w.map((x) => (spec.drawerLayout === 'graduated' ? Math.round((free * x) / sum) : r2((free * x) / sum)));
+  hs[n - 1] = r2(free - hs.slice(0, -1).reduce((a, b) => a + b, 0));
+  let z = zb + r;
+  const drawers = hs.map((h) => { const f = { z0: r2(z), h }; z += h + g; return f; });
+  return { drawers, door: null, railZ: null };
+}
 
 export class ModuleInputError extends Error {
   constructor(readonly code: string, message: string) { super(message); }
@@ -242,6 +280,9 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
 
   // Divisores: automáticos según la flecha calculada de entrepaños (o del piso si no hay entrepaños y no hay zoclo que lo apoye)
   const shelfDepthForSag = cd - ENGINE_DEFAULTS.shelfBackClearanceMm;
+  const layout = frontLayout(spec, zb);
+  // En «cajón + puertas» los entrepaños quedan bajo el travesaño fijo.
+  const shelfTop = layout.railZ !== null ? r2(layout.railZ - T / 2) : iz1;
   const hasShelves = spec.front !== 'drawers' && spec.shelvesPerBay > 0;
   const bottomSpans = spec.front !== 'drawers' && (spec.baseType === 'none' || spec.baseType === 'levelers');
   const sagOk = (span: number) => {
@@ -253,8 +294,9 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
     while (autoDividers < 8 && !sagOk((IW - autoDividers * T) / (autoDividers + 1)) && (IW - (autoDividers + 1) * T) / (autoDividers + 2) >= 250) autoDividers++;
   }
   let dividers = spec.dividerCount ?? autoDividers;
+  // Cajones a todo el ancho: sin divisores. En «cajón + puertas» los divisores llegan sólo hasta el travesaño.
   if (spec.front === 'drawers' && dividers > 0) {
-    b.issue({ code: 'DRAWERS_WITH_DIVIDERS', severity: 'warning', message: 'Los frentes de cajón ocupan todo el ancho: se omiten divisores. Divida en módulos si se requieren columnas.' });
+    if (spec.dividerCount) b.issue({ code: 'DRAWERS_WITH_DIVIDERS', severity: 'warning', message: 'Los frentes de cajón ocupan todo el ancho: se omiten divisores. Divida en módulos si se requieren columnas.' });
     dividers = 0;
   }
   const bays = dividers + 1;
@@ -262,8 +304,8 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
   if (bayW < 100) throw new ModuleInputError('BAY_TOO_NARROW', `Hueco interior de ${r2(bayW)} mm: demasiados divisores para el ancho.`);
   const bayX0 = (i: number) => T + i * (bayW + T);
   if (dividers > 0) {
-    b.part({ code: 'DIVIDER', name: 'Divisor vertical', role: 'divider', lengthMm: IH, widthMm: cd, thicknessMm: T, grainAxis: grain, edges: edgesFor(spec, 'side').slice(0, 1), materialId: material.id,
-      placements: Array.from({ length: dividers }, (_, i) => box(bayX0(i) + bayW, bayX0(i) + bayW + T, y0, y1, iz0, iz1)),
+    b.part({ code: 'DIVIDER', name: layout.railZ !== null ? 'Divisor vertical (hasta el travesaño)' : 'Divisor vertical', role: 'divider', lengthMm: r2(shelfTop - iz0), widthMm: cd, thicknessMm: T, grainAxis: grain, edges: edgesFor(spec, 'side').slice(0, 1), materialId: material.id,
+      placements: Array.from({ length: dividers }, (_, i) => box(bayX0(i) + bayW, bayX0(i) + bayW + T, y0, y1, iz0, shelfTop)),
       notes: spec.dividerCount === null ? [`Divisores automáticos: mínimo necesario para que la flecha calculada cumpla claro/${ctx.settings.sagLimitRatio} con ${designLoad(ctx)} kg/m².`] : [] });
   }
 
@@ -309,7 +351,7 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
       for (let i = 0; i < bays; i++) {
         const x0 = bayX0(i) + sc, x1 = bayX0(i) + bayW - sc;
         if (i === tower) {
-          for (const z of evenZ(iz0, iz1, spec.shelvesPerBay, T)) shelfPlacements.push(box(x0, x1, y0, y0 + shelfDepth, z, z + T));
+          for (const z of evenZ(iz0, shelfTop, spec.shelvesPerBay, T)) shelfPlacements.push(box(x0, x1, y0, y0 + shelfDepth, z, z + T));
           continue;
         }
         let railZ = iz1 - 60;
@@ -326,7 +368,7 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
       }
     } else {
       for (let i = 0; i < bays; i++) {
-        for (const z of evenZ(iz0, iz1, spec.shelvesPerBay, T)) shelfPlacements.push(box(bayX0(i) + sc, bayX0(i) + bayW - sc, y0, y0 + shelfDepth, z, z + T));
+        for (const z of evenZ(iz0, shelfTop, spec.shelvesPerBay, T)) shelfPlacements.push(box(bayX0(i) + sc, bayX0(i) + bayW - sc, y0, y0 + shelfDepth, z, z + T));
       }
     }
   }
@@ -352,8 +394,13 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
   }
 
   // Frentes
-  if (spec.front === 'doors') buildDoors(ctx, zb, dividers);
-  if (spec.front === 'drawers') buildDrawers(ctx, zb, cd, y0);
+  if (layout.railZ !== null) {
+    const rz = layout.railZ - T / 2;
+    b.part({ code: 'DRAWER_RAIL', name: 'Travesaño fijo bajo cajón', role: 'carcass', lengthMm: IW, widthMm: cd, thicknessMm: T, grainAxis: grain, edges: edgesFor(spec, 'carcass_front'), materialId: material.id,
+      placements: [box(T, W - T, y0, y1, r2(rz), r2(rz + T))], notes: ['Separa el cajón de las puertas; fijar con excéntrico o tornillo a ambos costados.'] });
+  }
+  if (layout.door) buildDoors(ctx, zb, dividers, layout.door);
+  if (layout.drawers.length) buildDrawers(ctx, cd, y0, layout.drawers);
 
   // Base / zoclo / herrería
   const steel: SteelRequirement[] = [];
@@ -413,14 +460,15 @@ export function evenZ(z0: number, z1: number, n: number, t: number): number[] {
   return Array.from({ length: n }, (_, i) => r2(z0 + free * (i + 1) + t * i));
 }
 
-function buildDoors(ctx: Ctx, zb: number, dividers: number) {
+function buildDoors(ctx: Ctx, zb: number, dividers: number, zone: FrontZone) {
   const { spec, L, b, material } = ctx;
   const { widthMm: W, heightMm: H, thicknessMm: T } = spec;
   const r = spec.revealMm, g = spec.frontGapMm;
   // Automático: hojas repartidas por hueco para que las juntas caigan sobre los divisores.
   const bays = dividers + 1;
   const n = spec.doorCount ?? bays * Math.max(1, Math.ceil(W / bays / ENGINE_DEFAULTS.maxDoorWidthMm));
-  const dh = H - 2 * r;
+  void H;
+  const dh = zone.h;
   // Tramos a cubrir: si las hojas son múltiplo de los huecos, cada tramo va de junta a junta,
   // con la junta centrada sobre el divisor (las hojas extremas cubren además el costado).
   const segments: [number, number, number][] = [];
@@ -451,7 +499,7 @@ function buildDoors(ctx: Ctx, zb: number, dividers: number) {
   for (const [dw, list] of groups) {
     const part = b.part({ code: gi === 0 ? 'DOOR' : `DOOR_${gi + 1}`, name: n === 1 ? 'Puerta sobrepuesta' : groups.size > 1 ? `Puerta sobrepuesta (hoja ${gi === 0 ? 'tipo A' : `tipo ${String.fromCharCode(65 + gi)}`})` : 'Puerta sobrepuesta (hoja)',
       role: 'front', lengthMm: dh, widthMm: dw, thicknessMm: T, grainAxis: 'length', edges: edgesFor(spec, 'front'), materialId: material.id,
-      placements: list.map((d) => box(d.x0, d.x1, 0, T, zb + r, zb + r + dh)),
+      placements: list.map((d) => box(d.x0, d.x1, 0, T, zone.z0, zone.z0 + dh)),
       notes: [`Holgura perimetral ${r} mm y ${g} mm entre hojas${dividers ? '; juntas centradas sobre divisores' : ''}. Verificar solape con la bisagra elegida.`], validationStatus: 'pending_validation' });
     if (gi === 0) door = part;
     if (dw > ENGINE_DEFAULTS.maxDoorWidthMm) b.issue({ code: 'DOOR_TOO_WIDE', severity: 'warning', partId: part.id, message: `Puerta de ${r2(dw)} mm de ancho: verificar pandeo, peso y apertura segura.` });
@@ -486,25 +534,29 @@ function handles(ctx: Ctx, n: number) {
   ctx.b.hw({ category: 'handle', productId: h.id, productKey: h.productKey, description: h.name, quantity: n, unit: h.unit, basis: '1 por frente', validationStatus: h.validationStatus });
 }
 
-function buildDrawers(ctx: Ctx, zb: number, cd: number, y0: number) {
+function buildDrawers(ctx: Ctx, cd: number, y0: number, zones: FrontZone[]) {
   const { spec, L, b, material, catalog } = ctx;
-  const { widthMm: W, heightMm: H, thicknessMm: T } = spec;
-  const n = Math.max(1, Math.round(spec.drawerCount));
-  const r = spec.revealMm, g = spec.frontGapMm;
-  const fh = (H - 2 * r - (n - 1) * g) / n;
-  if (fh < 80) throw new ModuleInputError('DRAWER_FRONT_TOO_LOW', `Frentes de cajón de ${r2(fh)} mm: demasiados cajones para el alto.`);
-  const fronts = Array.from({ length: n }, (_, i) => box(r, W - r, 0, T, zb + r + i * (fh + g), zb + r + i * (fh + g) + fh));
-  b.part({ code: 'DRAWER_FRONT', name: 'Frente de cajón sobrepuesto', role: 'front', lengthMm: W - 2 * r, widthMm: fh, thicknessMm: T, grainAxis: 'length', edges: edgesFor(spec, 'front'), materialId: material.id,
-    placements: fronts, validationStatus: 'pending_validation' });
+  const { widthMm: W, thicknessMm: T } = spec;
+  const n = zones.length;
+  const r = spec.revealMm;
+  if (Math.min(...zones.map((z) => z.h)) < 80) throw new ModuleInputError('DRAWER_FRONT_TOO_LOW', `Frentes de cajón de ${r2(Math.min(...zones.map((z) => z.h)))} mm: demasiados cajones para el alto.`);
+  // Frentes de igual alto comparten modelo de corte (DRAWER_FRONT, DRAWER_FRONT_2, …).
+  const groups: { h: number; zones: FrontZone[] }[] = [];
+  for (const z of zones) {
+    const g = groups.find((x) => Math.abs(x.h - z.h) < 0.02);
+    if (g) g.zones.push(z); else groups.push({ h: z.h, zones: [z] });
+  }
+  const sfx = (gi: number) => (gi === 0 ? '' : `_${gi + 1}`);
+  groups.forEach((g, gi) => {
+    b.part({ code: `DRAWER_FRONT${sfx(gi)}`, name: groups.length > 1 ? `Frente de cajón sobrepuesto (${r2(g.h)} mm)` : 'Frente de cajón sobrepuesto', role: 'front', lengthMm: W - 2 * r, widthMm: g.h, thicknessMm: T, grainAxis: 'length', edges: edgesFor(spec, 'front'), materialId: material.id,
+      placements: g.zones.map((z) => box(r, W - r, 0, T, z.z0, z.z0 + z.h)), validationStatus: 'pending_validation' });
+  });
   handles(ctx, n);
 
-  const slide = L.maybeHardware(spec.slideProductId);
-  if (!slide) {
-    const generic = L.hardware('slide-generic-telescopic');
-    b.hw({ category: 'drawer_slide', productId: null, productKey: 'hw:slide_unselected', description: 'Corredera por seleccionar', quantity: n, unit: 'juego', basis: '1 juego por cajón', validationStatus: 'pending_validation' });
-    b.issue({ code: 'DRAWER_SLIDE_NOT_SELECTED', severity: 'blocker', message: `Seleccione corredera (p. ej. "${generic.name}") para calcular la caja de cajón. No se calcula caja ni perforación sin ella.` });
-    return;
-  }
+  // Sin corredera elegida se usa la genérica (valores típicos) para que las cajas siempre se calculen.
+  const chosen = L.maybeHardware(spec.slideProductId);
+  const slide = chosen ?? L.hardware('slide-generic-telescopic');
+  if (!chosen) b.issue({ code: 'DRAWER_SLIDE_GENERIC', severity: 'warning', message: `Sin corredera elegida: cajas de cajón calculadas con «${slide.name}». Confirme la corredera real antes de cortar las cajas.` });
   b.hw({ category: 'drawer_slide', productId: slide.id, productKey: slide.productKey, description: slide.name, quantity: n, unit: slide.unit, basis: '1 juego por cajón', validationStatus: slide.validationStatus });
   const clearance = slide.params?.sideClearancePerSideMm;
   const lengths = slide.params?.nominalLengthsMm ?? [];
@@ -521,23 +573,27 @@ function buildDrawers(ctx: Ctx, zb: number, cd: number, y0: number) {
   const bottomMat = catalog.materials.find((m) => m.kind === 'back_panel' && m.thicknessMm === ENGINE_DEFAULTS.drawerBottomThicknessMm) ?? null;
   const bt = bottomMat?.thicknessMm ?? ENGINE_DEFAULTS.drawerBottomThicknessMm;
   const bw = W - 2 * T - 2 * clearance;
-  // Margen vertical entre frente y caja: deducción configurada o lo necesario para librar tapa/piso.
+  // Margen vertical entre frente y caja: deducción configurada o lo necesario para librar tapa, piso o travesaño.
   const margin = Math.max(ENGINE_DEFAULTS.drawerBoxHeightDeductionMm / 2, T - r + 2);
-  const bh = Math.min(fh - 2 * margin, 250);
-  if (bw < 100 || bh < 60) throw new ModuleInputError('DRAWER_BOX_TOO_SMALL', `Caja de cajón ${r2(bw)} × ${r2(bh)} mm demasiado pequeña.`);
   const xs0 = T + clearance, xs1 = W - T - clearance;
-  const sides: ReturnType<typeof box>[] = [], fbs: ReturnType<typeof box>[] = [], bottoms: ReturnType<typeof box>[] = [];
-  for (const f of fronts) {
-    const z0 = f.z0 + (fh - bh) / 2;
-    const z1 = z0 + bh;
-    bottoms.push(box(xs0, xs1, y0, y0 + len, z0, z0 + bt));
-    sides.push(box(xs0, xs0 + boxT, y0, y0 + len, z0 + bt, z1), box(xs1 - boxT, xs1, y0, y0 + len, z0 + bt, z1));
-    fbs.push(box(xs0 + boxT, xs1 - boxT, y0, y0 + boxT, z0 + bt, z1), box(xs0 + boxT, xs1 - boxT, y0 + len - boxT, y0 + len, z0 + bt, z1));
-  }
+  if (bw > 1000) b.issue({ code: 'DRAWER_TOO_WIDE', severity: 'warning', message: `Caja de cajón de ${r2(bw)} mm de ancho: puede flexionarse y trabarse. Considere dividir en dos módulos.` });
   const note = [`Calculada con ${slide.name}: holgura ${clearance} mm/lado, largo ${len} mm. Validar con ficha técnica.`];
-  b.part({ code: 'DRAWER_SIDE', name: 'Costado de caja de cajón', role: 'drawer_box', lengthMm: len, widthMm: bh - bt, thicknessMm: boxT, grainAxis: 'length', edges: spec.edgePolicy === 'none' ? [] : ['L1'], materialId: boxMat.id, placements: sides, notes: note, validationStatus: 'pending_validation' });
-  b.part({ code: 'DRAWER_FB', name: 'Frente/trasera de caja de cajón', role: 'drawer_box', lengthMm: bw - 2 * boxT, widthMm: bh - bt, thicknessMm: boxT, grainAxis: 'length', edges: spec.edgePolicy === 'none' ? [] : ['L1'], materialId: boxMat.id, placements: fbs, notes: note, validationStatus: 'pending_validation' });
-  b.part({ code: 'DRAWER_BOTTOM', name: 'Fondo de cajón sobrepuesto', role: 'drawer_box', lengthMm: len, widthMm: bw, thicknessMm: bt, grainAxis: 'none', edges: [], materialId: bottomMat?.id ?? 'hdf6', placements: bottoms, notes: note, validationStatus: 'pending_validation' });
+  groups.forEach((g, gi) => {
+    const bh = Math.min(g.h - 2 * margin, 250);
+    if (bw < 100 || bh < 60) throw new ModuleInputError('DRAWER_BOX_TOO_SMALL', `Caja de cajón ${r2(bw)} × ${r2(bh)} mm demasiado pequeña.`);
+    const sides: ReturnType<typeof box>[] = [], fbs: ReturnType<typeof box>[] = [], bottoms: ReturnType<typeof box>[] = [];
+    for (const f of g.zones) {
+      const z0 = r2(f.z0 + (g.h - bh) / 2);
+      const z1 = z0 + bh;
+      bottoms.push(box(xs0, xs1, y0, y0 + len, z0, z0 + bt));
+      sides.push(box(xs0, xs0 + boxT, y0, y0 + len, z0 + bt, z1), box(xs1 - boxT, xs1, y0, y0 + len, z0 + bt, z1));
+      fbs.push(box(xs0 + boxT, xs1 - boxT, y0, y0 + boxT, z0 + bt, z1), box(xs0 + boxT, xs1 - boxT, y0 + len - boxT, y0 + len, z0 + bt, z1));
+    }
+    const tag = groups.length > 1 ? ` (frente ${r2(g.h)} mm)` : '';
+    b.part({ code: `DRAWER_SIDE${sfx(gi)}`, name: `Costado de caja de cajón${tag}`, role: 'drawer_box', lengthMm: len, widthMm: r2(bh - bt), thicknessMm: boxT, grainAxis: 'length', edges: spec.edgePolicy === 'none' ? [] : ['L1'], materialId: boxMat.id, placements: sides, notes: note, validationStatus: 'pending_validation' });
+    b.part({ code: `DRAWER_FB${sfx(gi)}`, name: `Frente/trasera de caja de cajón${tag}`, role: 'drawer_box', lengthMm: bw - 2 * boxT, widthMm: r2(bh - bt), thicknessMm: boxT, grainAxis: 'length', edges: spec.edgePolicy === 'none' ? [] : ['L1'], materialId: boxMat.id, placements: fbs, notes: note, validationStatus: 'pending_validation' });
+    b.part({ code: `DRAWER_BOTTOM${sfx(gi)}`, name: `Fondo de cajón sobrepuesto${tag}`, role: 'drawer_box', lengthMm: len, widthMm: bw, thicknessMm: bt, grainAxis: 'none', edges: [], materialId: bottomMat?.id ?? 'hdf6', placements: bottoms, notes: note, validationStatus: 'pending_validation' });
+  });
   const side = b.parts.find((p) => p.code === 'SIDE')!;
   if (slide.machiningPatternId) b.machine(L.pattern(slide.machiningPatternId), side, n, 'Fijación de corredera', slide.id);
   b.issue({ code: 'DRAWER_BOX_PENDING_VALIDATION', severity: 'warning', message: 'Cajas de cajón calculadas con parámetros de corredera no verificados con ficha técnica.' });

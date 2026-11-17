@@ -15,18 +15,18 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await page.getByTestId('mod-width').fill('900');
   await expect(page.getByTestId('model-svg')).toContainText('900 mm · ANCHO');
   await page.getByTestId('tab-parts').click();
-  await expect(page.getByTestId('parts-table')).toContainText('M01-HORIZONTAL');
-  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).toContainText('864');
+  await expect(page.getByTestId('parts-table')).toContainText('M01-TAPA_PISO');
+  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-TAPA_PISO' })).toContainText('864');
 
   // Medidas de corte con compensación de canto y verificación dimensional
-  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).toContainText('558.55');
+  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-TAPA_PISO' })).toContainText('558.55');
   await page.getByTestId('tab-qc').click();
   await expect(page.getByTestId('dimension-checks')).toContainText('Ancho exterior');
   await expect(page.getByTestId('checks-errors')).toHaveText('0');
   await page.getByText('Ajustes del taller').click();
   await page.getByTestId('edge-compensation').uncheck();
   await page.getByTestId('tab-parts').click();
-  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-HORIZONTAL' })).not.toContainText('558.55');
+  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-TAPA_PISO' })).not.toContainText('558.55');
   await page.getByTestId('tab-qc').click();
   await page.getByText('Ajustes del taller').click();
   await page.getByTestId('edge-compensation').check();
@@ -60,11 +60,11 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await page.getByTestId('mod-front').selectOption('drawers');
   await page.getByTestId('mod-drawers').fill('3');
   await page.getByTestId('tab-parts').click();
-  await expect(page.getByTestId('parts-table')).toContainText('M01-DRAWER_FRONT');
-  await expect(page.getByTestId('parts-table')).not.toContainText('M01-DRAWER_SIDE');
+  await expect(page.getByTestId('parts-table')).toContainText('M01-FRENTE_CAJON');
+  await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO_CAJON'); // con corredera genérica por defecto
   await page.getByTestId('mod-slide').selectOption('slide-generic-telescopic');
-  await expect(page.getByTestId('parts-table')).toContainText('M01-DRAWER_SIDE');
-  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-DRAWER_SIDE' })).toContainText('Pendiente validación');
+  await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO_CAJON');
+  await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-COSTADO_CAJON' })).toContainText('Pendiente validación');
 
   // Precio pendiente => cotización INCOMPLETA
   await page.getByTestId('tab-quote').click();
@@ -77,8 +77,8 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await page.getByTestId('offer-demo-pajaro-mel18').check();
   await page.getByTestId('tab-quote').click();
   const table = page.getByTestId('quote-table');
-  await expect(table.locator('tr', { hasText: 'SmartSlide' })).toContainText('ESTIMATED');
-  await expect(table.locator('tr', { hasText: 'Melamina 18 mm' })).toContainText('PENDING');
+  await expect(table.locator('tr', { hasText: 'SmartSlide' })).toContainText('Estimado');
+  await expect(table.locator('tr', { hasText: 'Melamina 18 mm' })).toContainText('Pendiente');
   await expect(page.getByTestId('quote-status')).toHaveText('INCOMPLETO');
 
   // Guardar y congelar revisión
@@ -94,7 +94,7 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   expect(csv.suggestedFilename()).toMatch(/-despiece\.csv$/);
   const text = await readFile((await csv.path())!, 'utf8');
   expect(text.charCodeAt(0)).toBe(0xfeff);
-  expect(text).toContain('M01-DRAWER_FRONT');
+  expect(text).toContain('M01-FRENTE_CAJON');
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-pdf').click()]);
   expect(pdf.suggestedFilename()).toMatch(/-expediente\.pdf$/);
   const bytes = await readFile((await pdf.path())!);
@@ -103,7 +103,7 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   // El proyecto guardado se reabre sin cambios
   await page.reload();
   await page.getByTestId('tab-parts').click();
-  await expect(page.getByTestId('parts-table')).toContainText('M01-DRAWER_FRONT');
+  await expect(page.getByTestId('parts-table')).toContainText('M01-FRENTE_CAJON');
 });
 
 test('clóset y escritorio con herrería exigen validación', async ({ page }) => {
@@ -147,14 +147,14 @@ test('página general del taller', async ({ page }) => {
 test('portada: catálogo con búsqueda, categorías y proyectos recientes', async ({ page }) => {
   await page.goto('/');
   const grid = page.getByTestId('catalog-grid');
-  await expect(grid.locator('li')).toHaveCount(19);
+  await expect(grid.locator('li')).toHaveCount(21);
   await expect(grid.locator('svg').first()).toBeVisible();
   await page.getByTestId('catalog-search').fill('closet');
   await expect(grid.locator('li')).toHaveCount(1);
   await expect(grid).toContainText('Clóset');
   await page.getByTestId('catalog-search').fill('');
   await page.getByTestId('cat-kitchen').click();
-  await expect(grid.locator('li')).toHaveCount(4);
+  await expect(grid.locator('li')).toHaveCount(5);
   await page.getByTestId('cat-all').click();
   await page.getByTestId('family-desk').click();
   await page.waitForURL(/\/editor\/?\?id=/);
@@ -241,4 +241,43 @@ test('LED con router y precio de venta para Monterrey', async ({ page }) => {
   await page.reload();
   await page.getByTestId('tab-price').click();
   await expect(page.getByTestId('input-cost')).toHaveValue('9000');
+});
+
+test('cajones: cajas calculadas, cajón + puertas y etiquetas sin encimarse', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('family-dresser').click();
+  await expect(page.getByTestId('mod-drawer-layout')).toHaveValue('graduated');
+  // Las cajas de cajón salen aunque no se elija corredera
+  await page.getByTestId('tab-parts').click();
+  await expect(page.locator('#panel-parts')).toContainText('COSTADO_CAJON');
+  await page.getByTestId('tab-model').click();
+  await page.getByRole('button', { name: 'IDs' }).click();
+  await expect(page.getByTestId('model-svg').locator('text', { hasText: 'FRENTE_CAJON' }).first()).toBeVisible();
+  await expect(page.getByTestId('model-svg').locator('text', { hasText: 'COSTADO_CAJON' })).toHaveCount(0);
+  // Cajón arriba + puertas
+  await page.getByTestId('mod-front').selectOption('drawer_doors');
+  await expect(page.getByTestId('mod-top-drawers')).toBeVisible();
+  await expect(page.getByTestId('model-svg').locator('text', { hasText: 'PUERTA' }).first()).toBeVisible();
+  await expect(page.getByTestId('checks-summary')).not.toContainText('error');
+});
+
+test('ajustes: códigos en español por defecto y opción de inglés técnico', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('family-kitchen_base').click();
+  await page.getByTestId('tab-parts').click();
+  await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO');
+  await expect(page.getByTestId('parts-table')).not.toContainText('M01-SIDE');
+  const url = page.url();
+  await page.goto('/ajustes');
+  await expect(page.getByRole('heading', { name: 'Ajustes' })).toBeVisible();
+  await expect(page.getByTestId('lang-es')).toHaveAttribute('aria-checked', 'true');
+  await page.getByTestId('lang-en').click();
+  await page.goto(url);
+  await page.getByTestId('tab-parts').click();
+  await expect(page.getByTestId('parts-table')).toContainText('M01-SIDE');
+  await page.goto('/ajustes');
+  await page.getByTestId('lang-es').click();
+  await page.goto(url);
+  await page.getByTestId('tab-parts').click();
+  await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO');
 });

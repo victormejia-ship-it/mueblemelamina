@@ -2,7 +2,7 @@ import type { Project, ProjectRevisionRecord, ProjectSummary, SupplierOffer } fr
 
 export type RevisionMeta = Omit<ProjectRevisionRecord, 'snapshot'>;
 export type ExportFormat = 'json' | 'parts-csv' | 'quote-csv' | 'hardware-csv' | 'checks-csv' | 'tools-csv' | 'route-svg' | 'svg' | 'cut-svg' | 'mermaid' | 'pdf';
-export interface ExportOptions { revisionId?: string | null; separator?: ',' | ';'; exploded?: boolean; view?: 'iso' | 'front' | 'side' | 'top'; sheet?: number }
+export interface ExportOptions { revisionId?: string | null; separator?: ',' | ';'; exploded?: boolean; view?: 'iso' | 'front' | 'side' | 'top'; sheet?: number; /** Idioma de los códigos de pieza (español por defecto). */ lang?: 'es' | 'en' }
 export interface NewProjectInput { name: string; familyId: string; customer?: string; site?: string }
 export interface OfferImportResult { added: number; duplicates: number; errors: { row: number; message: string }[] }
 

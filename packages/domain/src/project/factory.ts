@@ -63,6 +63,7 @@ export function createModule(familyId: string, catalog: Catalog, id: string, lab
     front: f.defaults.front,
     doorCount: f.defaults.doorCount,
     drawerCount: f.defaults.drawerCount,
+    drawerLayout: f.defaults.drawerLayout ?? 'equal',
     shelvesPerBay: f.defaults.shelvesPerBay,
     dividerCount: null,
     baseType: f.defaults.baseType,

@@ -6,11 +6,13 @@ import { toolsCsv } from '@ms/export';
 import { saveBlob } from '@/lib/data/exports';
 import { Boxes, Download, TriangleAlert, Wrench } from 'lucide-react';
 import { STATION_ICON } from '../icons';
+import { useLang } from '@/lib/lang';
 import { BigStat, Button, Hint } from '../ui';
 import { EquipmentGrid, RouteFlow, WorkshopModelProvider } from '../workshop/WorkshopViews';
 
 /** Taller del proyecto: ruta de fabricación y equipo, a la vista lo esencial y el detalle a un toque. */
 export function WorkshopTab({ plan, project }: { plan: ManufacturingPlan; project: Project }) {
+  const { t } = useLang();
   const route = useMemo(() => workshopRoute(project, plan, DEFAULT_CATALOG), [project, plan]);
   const essential = route.equipment.filter((e) => e.need === 'esencial').length;
   const alerts = route.stations.reduce((s, x) => s + x.alerts.length, 0);
@@ -25,8 +27,8 @@ export function WorkshopTab({ plan, project }: { plan: ManufacturingPlan; projec
         <BigStat icon={<TriangleAlert className="h-5 w-5" />} value={alerts} label="avisos" tone={alerts ? 'warn' : 'ok'} />
         <BigStat icon={<Boxes className="h-5 w-5" />} value={`${kg} kg`} label="peso de tableros" />
         <div className="ml-auto flex gap-2 no-print">
-          <Button variant="secondary" onClick={() => saveBlob(routeDiagramSvg(route, project.name), 'image/svg+xml', `${project.id}-ruta-de-taller.svg`)} data-testid="download-route" title="Diagrama para imprimir"><Download aria-hidden className="mr-1 inline h-4 w-4" />Diagrama</Button>
-          <Button variant="secondary" onClick={() => saveBlob(toolsCsv(route, ';'), 'text/csv;charset=utf-8', `${project.id}-herramientas.csv`)} title="Lista de herramientas"><Download aria-hidden className="mr-1 inline h-4 w-4" />Herramientas</Button>
+          <Button variant="secondary" onClick={() => saveBlob(t(routeDiagramSvg(route, project.name)), 'image/svg+xml', `${project.id}-ruta-de-taller.svg`)} data-testid="download-route" title="Diagrama para imprimir"><Download aria-hidden className="mr-1 inline h-4 w-4" />Diagrama</Button>
+          <Button variant="secondary" onClick={() => saveBlob(t(toolsCsv(route, ';')), 'text/csv;charset=utf-8', `${project.id}-herramientas.csv`)} title="Lista de herramientas"><Download aria-hidden className="mr-1 inline h-4 w-4" />Herramientas</Button>
         </div>
       </div>
       <section>

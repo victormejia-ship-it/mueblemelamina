@@ -28,7 +28,10 @@ export type GeometryStrategy = 'box' | 'wardrobe' | 'desk' | 'composite';
  */
 export type FamilyStatus = 'verified_vertical' | 'configurable_base_template' | 'template_requires_engine_validation';
 
-export type FrontType = 'open' | 'doors' | 'drawers';
+/** drawer_doors: cajón(es) pequeños arriba y puertas abajo (base de cocina típica). */
+export type FrontType = 'open' | 'doors' | 'drawers' | 'drawer_doors';
+/** equal: frentes iguales; graduated: más chicos arriba y más altos abajo. */
+export type DrawerLayout = 'equal' | 'graduated';
 export type ConstructionStrategy = 'top_bottom_between_sides' | 'sides_between_top_bottom';
 export type BaseType = 'none' | 'plinth' | 'levelers' | 'steel_frame';
 export type Joinery = 'cam' | 'dowel' | 'screw' | 'mixed';
@@ -42,6 +45,7 @@ export interface FamilyDefaults {
   front: FrontType;
   doorCount: number | null;
   drawerCount: number;
+  drawerLayout?: DrawerLayout;
   shelvesPerBay: number;
   baseType: BaseType;
   baseHeightMm: Mm;
@@ -219,6 +223,7 @@ export interface ModuleSpec {
   /** null = automático según ancho máximo de hoja. */
   doorCount: number | null;
   drawerCount: number;
+  drawerLayout: DrawerLayout;
   shelvesPerBay: number;
   /** null = automático (luz libre del material). */
   dividerCount: number | null;

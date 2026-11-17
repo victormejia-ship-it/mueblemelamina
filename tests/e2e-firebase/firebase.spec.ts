@@ -39,7 +39,7 @@ test('Firebase: cuenta, proyecto en Firestore, guardado, revisión, exportación
   const [csv] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-parts-csv').click()]);
   const text = await readFile((await csv.path())!, 'utf8');
   expect(text.charCodeAt(0)).toBe(0xfeff);
-  expect(text).toContain('M01-HORIZONTAL');
+  expect(text).toContain('M01-TAPA_PISO');
   const [pdf] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-pdf').click()]);
   expect((await readFile((await pdf.path())!)).subarray(0, 5).toString()).toBe('%PDF-');
 

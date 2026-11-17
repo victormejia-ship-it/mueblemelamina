@@ -54,8 +54,9 @@ describe('medidas de corte con compensación de canto', () => {
 describe('verificación dimensional de todo el catálogo', () => {
   it('todas las familias y frentes cierran en medidas, sin piezas flotantes ni desajustes', () => {
     for (const f of FAMILIES) {
-      for (const front of ['open', 'doors', 'drawers'] as const) {
-        const r = calculateModule({ ...createModule(f.id, cat, 'X'), front, drawerCount: 3, slideProductId: 'slide-generic-telescopic' }, cat);
+      const low = f.defaults.heightMm < 400;
+      for (const front of ['open', 'doors', 'drawers', ...(low ? [] : ['drawer_doors' as const])] as const) {
+        const r = calculateModule({ ...createModule(f.id, cat, 'X'), front, drawerCount: front === 'drawer_doors' ? 1 : low ? 1 : 3, slideProductId: 'slide-generic-telescopic' }, cat);
         expect(r.issues.filter((i) => i.severity === 'error'), `${f.id}/${front}`).toEqual([]);
         const bad = r.checks.filter((c) => c.status === 'error' || c.status === 'warning').map((c) => `${c.label}: ${c.actual}`);
         expect(bad, `${f.id}/${front}`).toEqual([]);
@@ -197,8 +198,10 @@ describe('exportaciones con medidas de corte y verificación', async () => {
     p.modules[0] = base({ edgeBandId: 'pvc22x2' });
     const plan = planProject(p, cat, [], '2026-01-01', NOW);
     const rows = parseCsv(partsCsv(plan, cat));
+    expect(rows.some((r) => r[0] === 'M01-COSTADO')).toBe(true);
     const h = rows[0]!;
-    const door = rows.find((r) => r[0] === 'M01-DOOR')!;
+    const door = rows.find((r) => r[0] === 'M01-PUERTA')!;
+    expect(door[h.indexOf('Rol')]).toBe('Frente');
     expect(door[h.indexOf('Ancho final (mm)')]).toBe('396.5');
     expect(door[h.indexOf('Ancho de corte (mm)')]).toBe('392.5');
     const checks = parseCsv(checksCsv(plan));

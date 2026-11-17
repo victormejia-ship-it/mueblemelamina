@@ -1,4 +1,5 @@
 export * from './types';
+export * from './i18n';
 export * from './catalog';
 export * from './engine/helpers';
 export * from './engine/module';
