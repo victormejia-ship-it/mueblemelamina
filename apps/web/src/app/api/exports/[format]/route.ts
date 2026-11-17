@@ -1,6 +1,6 @@
 import { DEFAULT_CATALOG, localizeIds, workshopRoute } from '@ms/domain';
-import { routeDiagramSvg } from '@ms/geometry';
-import { buildPdf, checksCsv, toolsCsv, cutMapsSvg, hardwareCsv, partsCsv, projectJson, projectMermaid, projectSvg, quoteCsv, type CsvSeparator } from '@ms/export';
+import { cutPlanSvg, routeDiagramSvg } from '@ms/geometry';
+import { buildPdf, checksCsv, toolsCsv, hardwareCsv, partsCsv, projectJson, projectMermaid, projectSvg, quoteCsv, type CsvSeparator } from '@ms/export';
 import { getSession } from '@/server/auth';
 import { BadRequest, handle, readJson } from '@/server/http';
 import { loadPlan } from '@/server/service';
@@ -32,10 +32,8 @@ export const POST = handle(async (req: Request, ctx: Ctx) => {
     case 'checks-csv': return file(checksCsv(plan, sep, lang), 'text/csv; charset=utf-8', `${base}-verificacion.csv`);
     case 'svg': return file(projectSvg(project, plan, DEFAULT_CATALOG, { view: body.view ?? 'iso', exploded: !!body.exploded, showIds: !!body.exploded, lang }), 'image/svg+xml', `${base}-${body.view ?? 'iso'}.svg`);
     case 'cut-svg': {
-      const maps = cutMapsSvg(plan, lang);
-      const i = Math.max(0, Math.min(maps.length - 1, (body.sheet ?? 1) - 1));
-      if (!maps.length) throw new BadRequest('No hay acomodo de corte disponible');
-      return file(maps[i]!, 'image/svg+xml', `${base}-corte-${i + 1}.svg`);
+      if (!plan.nesting.some((n) => n.layout?.sheets.length)) throw new BadRequest('No hay acomodo de corte disponible');
+      return file(cutPlanSvg(plan.nesting, plan.calc.parts, { title: project.name, lang }), 'image/svg+xml', `${base}-plan-de-corte.svg`);
     }
     case 'mermaid': return file(projectMermaid(project, plan, lang), 'text/plain; charset=utf-8', `${base}-armado.mmd`);
     case 'pdf': return file(Buffer.from(await buildPdf(project, plan, DEFAULT_CATALOG, generatedAt, lang)), 'application/pdf', `${base}-expediente.pdf`);

@@ -25,6 +25,12 @@ export interface SceneOptions {
   focus?: Pick<ModelFocus, 'partIds' | 'edges' | 'diagonals' | 'labels' | 'led'> | null;
   /** Idioma de los códigos de pieza en las etiquetas (español por defecto). */
   lang?: CodeLang;
+  /**
+   * Paso de armado: muestra sólo `show` (ya colocadas) y `add` (las que se colocan en este paso, resaltadas y
+   * desplazadas según `shift` con una flecha hacia su lugar). Cada entrada es una clave de colocación (ID#n) o un ID de pieza.
+   * El encuadre es el del módulo completo para que todos los pasos tengan la misma escala.
+   */
+  assembly?: { show: string[]; add: string[]; shift?: Record<string, [number, number, number]> };
 }
 
 export type Pt = [number, number];
@@ -40,8 +46,10 @@ export interface ScenePolygon {
   selected: boolean;
   /** Atenuado (fuera del enfoque de la herramienta). */
   dim?: boolean;
+  /** Pieza que se coloca en el paso de armado actual. */
+  adding?: boolean;
 }
-export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' | 'edge' | 'diag' | 'led' }
+export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' | 'edge' | 'diag' | 'led' | 'arrow' }
 export interface SceneLabel { x: number; y: number; text: string; kind: 'dim' | 'id' | 'title' | 'subtitle' | 'focus'; anchor: 'start' | 'middle' | 'end' }
 
 export interface Scene {
@@ -248,6 +256,40 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     solids.push({ ...s, b: { ...s.b, x0: s.b.x0 + m.offsetXMm, x1: s.b.x1 + m.offsetXMm, y0: s.b.y0 + m.offsetYMm, y1: s.b.y1 + m.offsetYMm } });
   }
 
+  // Paso de armado: filtrar, desplazar lo que se agrega y preparar flechas
+  const asm = opts.assembly ?? null;
+  const addingKeys = new Set<string>();
+  let frameSolids: Solid[] | null = null;
+  const arrows3: { a: [number, number, number]; b: [number, number, number] }[] = [];
+  if (asm) {
+    const has = (list: string[], sl: Solid) => list.includes(sl.key) || list.includes(sl.partId);
+    const keep = solids.filter((sl) => has(asm.show, sl) || has(asm.add, sl));
+    const mods = new Set(keep.map((sl) => sl.moduleId));
+    frameSolids = solids.filter((sl) => mods.has(sl.moduleId));
+    solids.length = 0;
+    const groups = new Map<string, { d: [number, number, number]; boxes: Box3[] }>();
+    for (const sl of keep) {
+      if (!has(asm.add, sl)) { solids.push(sl); continue; }
+      addingKeys.add(sl.key);
+      const d = asm.shift?.[sl.key] ?? asm.shift?.[sl.partId] ?? [0, 0, 0];
+      const b = { x0: sl.b.x0 + d[0], x1: sl.b.x1 + d[0], y0: sl.b.y0 + d[1], y1: sl.b.y1 + d[1], z0: sl.b.z0 + d[2], z1: sl.b.z1 + d[2] };
+      solids.push({ ...sl, b });
+      if (d[0] || d[1] || d[2]) {
+        // Una flecha por grupo de piezas que se mueven igual (al centro del grupo).
+        const k = d.join(',');
+        const g = groups.get(k) ?? { d, boxes: [] as Box3[] };
+        g.boxes.push(sl.b);
+        groups.set(k, g);
+      }
+    }
+    for (const g of groups.values()) {
+      const bb = g.boxes.reduce((a, x) => ({ x0: Math.min(a.x0, x.x0), x1: Math.max(a.x1, x.x1), y0: Math.min(a.y0, x.y0), y1: Math.max(a.y1, x.y1), z0: Math.min(a.z0, x.z0), z1: Math.max(a.z1, x.z1) }));
+      const to: [number, number, number] = [(bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2, (bb.z0 + bb.z1) / 2];
+      const from: [number, number, number] = [to[0] + g.d[0], to[1] + g.d[1], to[2] + g.d[2]];
+      arrows3.push({ a: from, b: [from[0] - g.d[0] * 0.8, from[1] - g.d[1] * 0.8, from[2] - g.d[2] * 0.8] });
+    }
+  }
+
   // Extensión total para cotas (sin explosión)
   const real = calc.modules.flatMap((m) => m.parts.flatMap((p) => p.placements.map((b) => ({ ...b, x0: b.x0 + m.offsetXMm, x1: b.x1 + m.offsetXMm, y0: b.y0 + m.offsetYMm, y1: b.y1 + m.offsetYMm }))));
   const ext = real.length
@@ -333,7 +375,14 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   const rawPolys: { s: Solid; face: 'top' | 'front' | 'side'; pts: Pt[] }[] = [];
   for (const s of ordered) for (const f of faces(view, s.b)) rawPolys.push({ s, face: f.face, pts: f.pts.map(([x, y, z]) => project3(view, x, y, z)) });
   const rawDims = dims.map((d) => ({ ...d, pa: project3(view, ...d.a), pb: project3(view, ...d.b) }));
-  const allPts = [...rawPolys.flatMap((p) => p.pts), ...rawDims.flatMap((d) => [d.pa, d.pb])];
+  let allPts = [...rawPolys.flatMap((p) => p.pts), ...rawDims.flatMap((d) => [d.pa, d.pb])];
+  if (frameSolids?.length) {
+    // Encuadre fijo para todos los pasos: caja del módulo ampliada por el desplazamiento máximo.
+    const pad = 320;
+    const bb = frameSolids.reduce((a, x) => ({ x0: Math.min(a.x0, x.b.x0), x1: Math.max(a.x1, x.b.x1), y0: Math.min(a.y0, x.b.y0), y1: Math.max(a.y1, x.b.y1), z0: Math.min(a.z0, x.b.z0), z1: Math.max(a.z1, x.b.z1) }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, z0: Infinity, z1: -Infinity });
+    allPts = [];
+    for (const x of [bb.x0 - pad, bb.x1 + pad]) for (const y of [bb.y0 - pad, bb.y1 + pad]) for (const z of [bb.z0 - pad * 0.6, bb.z1 + pad * 0.6]) allPts.push(project3(view, x, y, z));
+  }
   const minX = Math.min(...allPts.map((p) => p[0])), maxX = Math.max(...allPts.map((p) => p[0]));
   const minY = Math.min(...allPts.map((p) => p[1])), maxY = Math.max(...allPts.map((p) => p[1]));
   const margin = opts.minimal ? 6 : 70, top = opts.minimal ? 6 : opts.noTitle ? 36 : 80;
@@ -348,6 +397,10 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     const c = colorsFor(part ?? { role: s.role }, finish.colors);
     const selected = opts.selectedPartId === s.partId;
     const inFocus = !focus || focusSet.has(s.partId);
+    if (addingKeys.has(s.key)) {
+      const a = { top: '#f7c98b', front: '#eba24f', side: '#c97a2a' };
+      return { key: `${s.key}-${face}`, partId: s.partId, moduleId: s.moduleId, role: s.role, points: pts.map(T), fill: a[face], stroke: '#8a4a0a', selected: false, adding: true };
+    }
     return {
       key: `${s.key}-${face}`, partId: s.partId, moduleId: s.moduleId, role: s.role, points: pts.map(T),
       fill: selected ? shade(c[face], 0.35) : focus && inFocus ? shade(c[face], 0.12) : c[face],
@@ -367,6 +420,10 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   for (const e of extra3) {
     const a = T(project3(view, ...e.a)), b = T(project3(view, ...e.b));
     lines.push({ x1: a[0], y1: a[1], x2: b[0], y2: b[1], kind: e.kind });
+  }
+  for (const e of arrows3) {
+    const a = T(project3(view, ...e.a)), b = T(project3(view, ...e.b));
+    lines.push({ x1: a[0], y1: a[1], x2: b[0], y2: b[1], kind: 'arrow' });
   }
   for (const l of extraLabels3) {
     const p = T(project3(view, ...l.p));
@@ -390,12 +447,14 @@ export function sceneToSvg(scene: Scene, theme: 'dark' | 'light' | 'transparent'
   const parts: string[] = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${scene.width} ${scene.height}" width="${scene.width}" height="${scene.height}" role="img" aria-label="${esc(scene.ariaLabel)}" font-family="Inter, system-ui, sans-serif">`);
   parts.push(`<title>${esc(scene.ariaLabel)}</title>`);
+  parts.push(`<defs><marker id="ms-push" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="7" refY="7" orient="auto"><path d="M0,1 L14,7 L0,13 z" fill="#d9480f"/></marker></defs>`);
   parts.push(`<defs><marker id="ms-arrow" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8" fill="none" stroke="${dim}" stroke-width="1.2"/></marker></defs>`);
   if (theme !== 'transparent') parts.push(`<rect width="100%" height="100%" fill="${bg}"/>`);
   for (const p of scene.polygons) parts.push(`<polygon data-part-id="${esc(p.partId)}" points="${p.points.map((x) => x.join(',')).join(' ')}" fill="${p.fill}" stroke="${p.stroke}" stroke-width="${p.selected ? 2.4 : 1}" stroke-linejoin="round"${p.dim ? ' opacity="0.18"' : ''}/>`);
   for (const l of scene.lines) {
     if (l.kind === 'edge') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#ff9f43" stroke-width="3" stroke-linecap="round"/>`);
     else if (l.kind === 'diag') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#5fd4ef" stroke-width="2" stroke-dasharray="8 5"/>`);
+    else if (l.kind === 'arrow') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#d9480f" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 5" marker-end="url(#ms-push)"/>`);
     else if (l.kind === 'led') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#ffd84d" stroke-width="3.5" stroke-linecap="round"/>`);
     else parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${dim}" stroke-width="1.3" marker-start="url(#ms-arrow)" marker-end="url(#ms-arrow)"/>`);
   }
@@ -440,6 +499,8 @@ export function cutSheetSvg(s: CutSheetInput, width = 820, fluid = false): strin
 }
 export * from './workshop';
 export * from './render';
+export * from './cutplan';
+export * from './assembly';
 
 
 /**

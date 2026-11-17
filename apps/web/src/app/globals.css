@@ -42,3 +42,6 @@ pre { white-space: pre; overflow: auto; background: #0e1720; border: 1px solid #
   .ms-fade-up { animation: none; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
+
+/* Red de seguridad: nada debe ensanchar la página más que la pantalla (las tablas tienen su propio scroll). */
+html, body { overflow-x: clip; }

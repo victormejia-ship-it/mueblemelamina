@@ -281,3 +281,25 @@ test('ajustes: códigos en español por defecto y opción de inglés técnico', 
   await page.getByTestId('tab-parts').click();
   await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO');
 });
+
+test('plan de corte único, instructivo ilustrado y sin desbordes en tableta', async ({ page }) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.goto('/');
+  await page.getByTestId('family-kitchen_base_drawer').click();
+  await page.waitForURL(/editor/);
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(await overflow()).toBeLessThanOrEqual(0);
+  await page.getByTestId('tab-cut').click();
+  await expect(page.getByTestId('cut-plan').locator('svg')).toHaveCount(1);
+  await expect(page.getByTestId('cut-plan')).toContainText('Tablero 1 de');
+  await expect(page.getByTestId('cut-plan')).toContainText('Piezas');
+  const [svg] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-cut-plan').click()]);
+  expect(svg.suggestedFilename()).toMatch(/plan-de-corte\.svg$/);
+  await page.getByTestId('tab-assembly').click();
+  await expect(page.getByTestId('assembly-step').first()).toBeVisible();
+  expect(await page.getByTestId('assembly-step').count()).toBeGreaterThanOrEqual(6);
+  await expect(page.getByTestId('assembly-step').first()).toContainText('Une los costados al piso');
+  expect(await overflow()).toBeLessThanOrEqual(0);
+  await page.setViewportSize({ width: 1024, height: 1366 });
+  expect(await overflow()).toBeLessThanOrEqual(0);
+});

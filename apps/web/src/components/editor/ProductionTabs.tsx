@@ -2,8 +2,9 @@
 import { useMemo, useState } from 'react';
 import { DEFAULT_CATALOG, STEEL_FINISH_ES, assemblySteps, catalogLookup, hwCategoryLabel, mermaidDiagram, patternLabel, type ManufacturingPlan, type Project } from '@ms/domain';
 import { useLang } from '@/lib/lang';
-import { cutSheetSvg } from '@ms/geometry';
-import { Alert, Badge, Button, EmptyState, Hint, Stat } from '../ui';
+import { assemblyGuide, cutPlanSvg } from '@ms/geometry';
+import { saveBlob } from '@/lib/data/exports';
+import { Alert, Badge, Button, EmptyState, Hint, More, Stat } from '../ui';
 import { NumberInput } from './inputs';
 
 const L = catalogLookup(DEFAULT_CATALOG);
@@ -47,30 +48,25 @@ export function PartsTab({ plan, selected, onSelect }: { plan: ManufacturingPlan
 }
 
 export function CutTab({ plan, project, onCut }: { plan: ManufacturingPlan; project: Project; onCut: (c: Project['cut']) => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const svg = useMemo(() => cutPlanSvg(plan.nesting, plan.calc.parts, { title: project.name, lang }), [plan.nesting, plan.calc.parts, project.name, lang]);
+  const total = plan.nesting.reduce((s, n) => s + (n.sheetsRequired ?? n.areaEstimate.sheetsEstimated), 0);
+  const unplaced = plan.nesting.flatMap((n) => n.layout?.unplaced ?? []);
   return (
-    <div className="grid gap-4">
-      <div className="grid max-w-md grid-cols-2 gap-2">
-        <NumberInput label="Kerf (disco)" suffix="mm" value={project.cut.kerfMm} min={0} max={10} step={0.1} onChange={(v) => onCut({ ...project.cut, kerfMm: v })} />
-        <NumberInput label="Escuadrado por lado" suffix="mm" value={project.cut.trimMarginMm} min={0} max={50} onChange={(v) => onCut({ ...project.cut, trimMarginMm: v })} />
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid w-full max-w-md grid-cols-2 gap-2">
+          <NumberInput label="Kerf (disco)" suffix="mm" value={project.cut.kerfMm} min={0} max={10} step={0.1} onChange={(v) => onCut({ ...project.cut, kerfMm: v })} />
+          <NumberInput label="Escuadrado por lado" suffix="mm" value={project.cut.trimMarginMm} min={0} max={50} onChange={(v) => onCut({ ...project.cut, trimMarginMm: v })} />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {plan.nesting.map((n) => <Badge key={n.materialId} tone={n.sheetsRequired !== null ? 'ok' : 'warn'}>{n.materialName}: {n.sheetsRequired ?? `~${n.areaEstimate.sheetsEstimated}`}</Badge>)}
+        </div>
+        <Button variant="secondary" className="ml-auto" onClick={() => saveBlob(svg, 'image/svg+xml', `${project.id}-plan-de-corte.svg`)} data-testid="download-cut-plan">Descargar plan</Button>
       </div>
-      {plan.nesting.map((n) => (
-        <section key={n.materialId} className="grid gap-2 rounded-xl border border-line p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold">{n.materialName}</h3>
-            {n.sheetsRequired !== null ? <Badge tone="ok">Acomodo confirmado · {n.sheetsRequired} tablero(s)</Badge> : <Badge tone="warn">sin confirmar</Badge>}
-            <Badge tone="neutral" title="Una estimación por área nunca confirma el número de tableros">Estimación por área: {n.areaEstimate.sheetsEstimated} (sin validar)</Badge>
-          </div>
-          <Hint label="Nota">{n.note}</Hint>
-          {n.layout?.unplaced.length ? <Alert tone="err">Sin acomodo: {t(n.layout.unplaced.map((u) => `${u.partId}#${u.instance} (${u.reason})`).join('; '))}</Alert> : null}
-          <div className="grid gap-3 xl:grid-cols-2">
-            {n.layout?.sheets.map((s) => (
-              <div key={s.index} className="overflow-auto rounded-lg bg-white" dangerouslySetInnerHTML={{ __html: t(cutSheetSvg({ materialName: n.materialName, sheet: n.layout!.sheet, index: s.index, utilization: s.utilization, placements: s.placements }, 820, true)) }} />
-            ))}
-          </div>
-        </section>
-      ))}
-      <Hint>Optimizador guillotina (Best Short Side Fit) con kerf, escuadrado y veta. No considera defectos, retazos en inventario ni secuencia de seccionadora: validar en el optimizador del taller.</Hint>
+      {unplaced.length ? <Alert tone="err">Sin acomodo: {t(unplaced.map((u) => `${u.partId}#${u.instance} (${u.reason})`).join('; '))}</Alert> : null}
+      <div className="overflow-hidden rounded-xl bg-white" data-testid="cut-plan" aria-label={`Plan de corte: ${total} tableros`} dangerouslySetInnerHTML={{ __html: svg }} />
+      <Hint>Todos los tableros en un solo plan. Cada material va en su propio tablero porque el espesor es distinto; si el proyecto necesita otro tablero, aparece abajo. Optimizador guillotina con kerf, escuadrado y veta: validar en la seccionadora del taller.</Hint>
     </div>
   );
 }
@@ -140,25 +136,57 @@ export function MachiningTab({ plan }: { plan: ManufacturingPlan }) {
 export function AssemblyTab({ plan, project }: { plan: ManufacturingPlan; project: Project }) {
   const { t, lang } = useLang();
   const code = useMemo(() => mermaidDiagram(project, plan.calc, lang), [project, plan.calc, lang]);
+  const guide = useMemo(() => assemblyGuide(project, plan.calc, DEFAULT_CATALOG, lang), [project, plan.calc, lang]);
   const [copied, setCopied] = useState(false);
+  const multi = project.modules.length > 1;
   return (
-    <div className="grid gap-4">
-      {project.modules.map((m) => (
-        <section key={m.id}>
-          <h3 className="mb-1 font-semibold">{m.id} · {m.label}</h3>
-          <ol className="list-decimal space-y-1 pl-6 text-[13px]">
-            {assemblySteps(m, plan.calc).map((s) => (
-              <li key={s.id}><span className="font-semibold">{s.title}</span>{s.pending && <> <Badge tone="warn">pendiente de validación</Badge></>} — <span className="text-muted">{t(s.detail)}</span></li>
-            ))}
-          </ol>
-        </section>
-      ))}
-      <section>
-        <div className="mb-1 flex items-center justify-between"><h3 className="font-semibold">Mermaid · diagrama de dependencias</h3>
-          <Button variant="secondary" onClick={async () => { await navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? 'Copiado' : 'Copiar Mermaid'}</Button></div>
-        <pre data-testid="mermaid-code" className="max-h-[360px]">{code}</pre>
-        <p className="mt-1 text-[11.5px] text-muted">Sintaxis lista para Mermaid.js o cualquier visor compatible (no se carga la librería en la app para mantenerla ligera).</p>
-      </section>
+    <div className="grid gap-4" data-testid="assembly-guide">
+      <div className="flex flex-wrap items-center gap-2 no-print">
+        <span className="flex items-center gap-1.5 text-[12.5px] text-muted"><span className="h-3 w-3 rounded-sm bg-[#eba24f]" />Pieza que se coloca en el paso</span>
+        <Button variant="secondary" className="ml-auto" onClick={() => window.print()} data-testid="print-guide">Imprimir instructivo</Button>
+      </div>
+      {project.modules.map((m) => {
+        const steps = guide.filter((g) => g.moduleId === m.id);
+        if (!steps.length) return null;
+        return (
+          <section key={m.id} className="grid gap-2">
+            {multi && <h3 className="text-[15px] font-bold">{m.id} · {m.label}</h3>}
+            <ol className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {steps.map((st) => (
+                <li key={st.number} className="flex break-inside-avoid flex-col overflow-hidden rounded-xl border border-line bg-panel-2" data-testid="assembly-step">
+                  <div className="flex items-center gap-2 px-3 pt-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#d9480f] text-[15px] font-extrabold text-white">{st.number}</span>
+                    <h4 className="text-[14.5px] font-bold leading-tight">{st.title}</h4>
+                  </div>
+                  <div className="m-2 overflow-hidden rounded-lg bg-white [&>svg]:h-auto [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: st.svg }} />
+                  <div className="flex flex-wrap gap-1.5 px-3 pb-2.5">
+                    {st.hardware.map((h) => <span key={h} className="rounded-full bg-[#1d3140] px-2 py-0.5 text-[12px] font-semibold text-[#cfeff7]">{h}</span>)}
+                    {st.tip && <p className="w-full text-[12px] text-warn">{st.tip}</p>}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        );
+      })}
+      <More summary="Pasos en texto (detalle técnico)">
+        <div className="grid gap-3">
+          {project.modules.map((m) => (
+            <section key={m.id}>
+              <h3 className="mb-1 font-semibold">{m.id} · {m.label}</h3>
+              <ol className="list-decimal space-y-1 pl-6 text-[13px]">
+                {assemblySteps(m, plan.calc).map((s) => (
+                  <li key={s.id} className="break-words"><span className="font-semibold">{s.title}</span>{s.pending && <> <Badge tone="warn">pendiente de validación</Badge></>} — <span className="text-muted">{t(s.detail)}</span></li>
+                ))}
+              </ol>
+            </section>
+          ))}
+        </div>
+      </More>
+      <More summary="Diagrama de dependencias (Mermaid)">
+        <div className="mb-1 flex justify-end"><Button variant="secondary" onClick={async () => { await navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? 'Copiado' : 'Copiar Mermaid'}</Button></div>
+        <pre data-testid="mermaid-code" className="max-h-[360px] overflow-auto">{code}</pre>
+      </More>
     </div>
   );
 }

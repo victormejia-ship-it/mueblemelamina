@@ -146,7 +146,7 @@ export function Editor({ initial }: { initial: Project }) {
         {!saveFailed && <button type="button" onClick={save} disabled={saving || !dirty || readOnly} data-testid="save" className="sr-only">Guardar</button>}
         <details className="relative w-full sm:w-auto">
           <summary className="cursor-pointer list-none text-[12.5px] font-semibold text-[#bce8f2] [&::-webkit-details-marker]:hidden">{project.customer || project.site ? `${project.customer}${project.customer && project.site ? ' · ' : ''}${project.site}` : '+ Cliente y obra'}</summary>
-          <div className="mt-2 grid gap-2 sm:absolute sm:z-20 sm:w-80 sm:rounded-xl sm:border sm:border-line sm:bg-panel sm:p-3">
+          <div className="mt-2 grid gap-2 sm:absolute sm:right-0 sm:z-20 sm:w-80 sm:max-w-[calc(100vw-2rem)] sm:rounded-xl sm:border sm:border-line sm:bg-panel sm:p-3">
             <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Cliente<input value={project.customer} maxLength={160} onChange={(e) => update({ ...project, customer: e.target.value })} disabled={readOnly} /></label>
             <label className="grid gap-1 text-[11.5px] font-semibold text-[#aebdcc]">Obra<input value={project.site} maxLength={240} onChange={(e) => update({ ...project, site: e.target.value })} disabled={readOnly} /></label>
           </div>

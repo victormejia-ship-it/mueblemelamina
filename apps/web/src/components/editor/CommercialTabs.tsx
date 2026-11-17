@@ -240,7 +240,7 @@ export function ExportTab({ project, dirty, onSave, revisionId }: { project: Pro
     { f: 'json', label: 'JSON versionado', desc: 'Proyecto + cálculo + acomodo + cotización (schemaVersion, calcVersion).' },
     { f: 'svg', label: 'SVG isométrico', desc: 'Vector con cotas en mm e IDs de pieza.' },
     { f: 'svg', label: 'SVG despiece separado', desc: 'Piezas separadas con etiquetas.', extra: { exploded: true } },
-    { f: 'cut-svg', label: 'SVG mapa de corte (tablero 1)', desc: 'Acomodo guillotina del primer tablero.' },
+    { f: 'cut-svg', label: 'SVG plan de corte', desc: 'Todos los tableros en un solo diagrama, con piezas numeradas y sobrantes.' },
     { f: 'mermaid', label: 'Mermaid (.mmd)', desc: 'Diagrama de dependencias de armado.' },
   ];
   return (
