@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { openTab } from './nav';
 
 async function createProject(page: Page, _name: string, family = 'kitchen_base') {
   await page.goto('/');
@@ -14,27 +15,27 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   // Cambiar medidas: el SVG y el despiece se actualizan
   await page.getByTestId('mod-width').fill('900');
   await expect(page.getByTestId('model-svg')).toContainText('900 mm · ANCHO');
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.getByTestId('parts-table')).toContainText('M01-TAPA_PISO');
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-TAPA_PISO' })).toContainText('864');
 
   // Medidas de corte con compensación de canto y verificación dimensional
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-TAPA_PISO' })).toContainText('558.55');
-  await page.getByTestId('tab-qc').click();
+  await openTab(page, 'qc');
   await expect(page.getByTestId('dimension-checks')).toContainText('Ancho exterior');
   await expect(page.getByTestId('checks-errors')).toHaveText('0');
   await page.getByText('Ajustes del taller').click();
   await page.getByTestId('edge-compensation').uncheck();
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-TAPA_PISO' })).not.toContainText('558.55');
-  await page.getByTestId('tab-qc').click();
+  await openTab(page, 'qc');
   await page.getByText('Ajustes del taller').click();
   await page.getByTestId('edge-compensation').check();
-  await page.getByTestId('tab-model').click();
+  await openTab(page, 'model');
   await expect(page.getByTestId('checks-summary')).toHaveText('Todo cuadra');
 
   // Ruta de taller con equipo y fichas
-  await page.getByTestId('tab-workshop').click();
+  await openTab(page, 'workshop');
   await expect(page.getByTestId('route-flow')).toContainText('Corte de tableros');
   await expect(page.getByTestId('route-flow')).toContainText('Canteado');
   await expect(page.getByTestId('tool-table')).toContainText('Seccionadora');
@@ -47,10 +48,10 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await expect(page.getByTestId('model-sheet').locator('line[data-kind="edge"]').first()).toBeAttached();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('model-sheet')).toBeHidden();
-  await page.getByTestId('tab-model').click();
+  await openTab(page, 'model');
 
   // Error bloqueante si W <= 2T
-  await page.getByTestId('tab-model').click();
+  await openTab(page, 'model');
   await page.getByTestId('mod-width').fill('30');
   await expect(page.getByRole('alert').filter({ hasText: 'no existe plan fabricable' })).toBeVisible();
   await page.getByTestId('mod-width').fill('800');
@@ -59,7 +60,7 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   // Agregar cajones; sin corredera no se calcula caja
   await page.getByTestId('mod-front').selectOption('drawers');
   await page.getByTestId('mod-drawers').fill('3');
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.getByTestId('parts-table')).toContainText('M01-FRENTE_CAJON');
   await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO_CAJON'); // con corredera genérica por defecto
   await page.getByTestId('mod-slide').selectOption('slide-generic-telescopic');
@@ -67,15 +68,15 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
   await expect(page.getByTestId('parts-table').locator('tr', { hasText: 'M01-COSTADO_CAJON' })).toContainText('Pendiente validación');
 
   // Precio pendiente => cotización INCOMPLETA
-  await page.getByTestId('tab-quote').click();
+  await openTab(page, 'quote');
   await expect(page.getByTestId('quote-status')).toHaveText('INCOMPLETO');
 
   // Elegir proveedor: corredera SmartSlide con oferta estimada del prototipo
   await page.getByTestId('mod-slide').selectOption('slide-samet-smartslide-350');
-  await page.getByTestId('tab-offers').click();
+  await openTab(page, 'offers');
   await page.getByTestId('offer-demo-tym-slide-smart').check();
   await page.getByTestId('offer-demo-pajaro-mel18').check();
-  await page.getByTestId('tab-quote').click();
+  await openTab(page, 'quote');
   const table = page.getByTestId('quote-table');
   await expect(table.locator('tr', { hasText: 'SmartSlide' })).toContainText('Estimado');
   await expect(table.locator('tr', { hasText: 'Melamina 18 mm' })).toContainText('Pendiente');
@@ -83,13 +84,13 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
 
   // Guardar y congelar revisión
   await expect(page.getByTestId('save-state')).toHaveText('Guardado', { timeout: 10_000 });
-  await page.getByTestId('tab-history').click();
+  await openTab(page, 'history');
   await page.getByTestId('revision-note').fill('Primera revisión E2E');
   await page.getByTestId('create-revision').click();
   await expect(page.getByRole('cell', { name: 'Primera revisión E2E' })).toBeVisible();
 
   // Descargar exportaciones
-  await page.getByTestId('tab-export').click();
+  await openTab(page, 'export');
   const [csv] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-parts-csv').click()]);
   expect(csv.suggestedFilename()).toMatch(/-despiece\.csv$/);
   const text = await readFile((await csv.path())!, 'utf8');
@@ -102,7 +103,7 @@ test('crear proyecto, cambiar medidas, cajones, proveedor, precio pendiente, gua
 
   // El proyecto guardado se reabre sin cambios
   await page.reload();
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.getByTestId('parts-table')).toContainText('M01-FRENTE_CAJON');
 });
 
@@ -111,11 +112,11 @@ test('clóset y escritorio con herrería exigen validación', async ({ page }) =
   await page.getByTestId('add-module').selectOption('wardrobe');
   await page.getByTestId('add-module').selectOption('desk');
   await page.getByTestId('mod-desk-structure').selectOption('steel');
-  await page.getByTestId('tab-qc').click();
+  await openTab(page, 'qc');
   await expect(page.getByTestId('issues-list')).toContainText('anclaje antivuelco');
   await expect(page.getByTestId('issues-list')).toContainText('validar cargas');
   await expect(page.getByTestId('release-status')).toHaveText('Pendiente de validación');
-  await page.getByTestId('tab-hardware').click();
+  await openTab(page, 'hardware');
   await expect(page.getByText(/barra\(s\) de 6.1 m/)).toBeVisible();
 });
 
@@ -178,7 +179,7 @@ test('editor: medidas rápidas junto al dibujo y guardado automático', async ({
   await expect(page.getByTestId('dimension-checks')).toBeVisible();
 
   // Editar justo mientras se guarda: el último cambio no se pierde
-  await page.getByTestId('tab-model').click();
+  await openTab(page, 'model');
   await page.getByTestId('quick-height').fill('1800');
   await page.waitForTimeout(1250);
   await page.getByTestId('quick-height').fill('1750');
@@ -212,14 +213,14 @@ test('LED con router y precio de venta para Monterrey', async ({ page }) => {
   await expect(page.getByTestId('model-svg').locator('line[data-kind="led"]')).toHaveCount(1);
 
   // Taller: el router aparece como esencial y señala la ranura en el modelo
-  await page.getByTestId('tab-workshop').click();
+  await openTab(page, 'workshop');
   await expect(page.getByTestId('equipment-router')).toBeVisible();
   await page.getByTestId('equipment-model-router').click();
   await expect(page.getByTestId('model-sheet').locator('line[data-kind="led"]')).toHaveCount(1);
   await page.keyboard.press('Escape');
 
   // Precio de venta
-  await page.getByTestId('tab-price').click();
+  await openTab(page, 'price');
   await expect(page.getByTestId('price-tab')).toBeVisible();
   await expect(page.getByTestId('market-bar')).toBeVisible();
   await expect(page.getByTestId('tier-saludable')).toContainText('Sin LED');
@@ -227,7 +228,7 @@ test('LED con router y precio de venta para Monterrey', async ({ page }) => {
   const estimated = await page.getByTestId('price-recommended').textContent();
   await page.getByTestId('input-cost').fill('9000');
   await expect(page.getByTestId('price-recommended')).not.toHaveText(estimated ?? '');
-  await expect(page.getByTestId('price-breakdown')).toContainText('lo que capturaste');
+  await expect(page.getByTestId('price-breakdown')).toContainText('Insumos');
   await expect(page.getByTestId('price-health')).toContainText('Utilidad neta');
   await page.getByTestId('tier-premium').click();
   await expect(page.getByTestId('tier-premium')).toHaveAttribute('aria-checked', 'true');
@@ -239,7 +240,7 @@ test('LED con router y precio de venta para Monterrey', async ({ page }) => {
   // Se guarda con el proyecto
   await expect(page.getByTestId('save-state')).toContainText('Guardado', { timeout: 10_000 });
   await page.reload();
-  await page.getByTestId('tab-price').click();
+  await openTab(page, 'price');
   await expect(page.getByTestId('input-cost')).toHaveValue('9000');
 });
 
@@ -248,9 +249,9 @@ test('cajones: cajas calculadas, cajón + puertas y etiquetas sin encimarse', as
   await page.getByTestId('family-dresser').click();
   await expect(page.getByTestId('mod-drawer-layout')).toHaveValue('graduated');
   // Las cajas de cajón salen aunque no se elija corredera
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.locator('#panel-parts')).toContainText('COSTADO_CAJON');
-  await page.getByTestId('tab-model').click();
+  await openTab(page, 'model');
   await page.getByRole('button', { name: 'IDs' }).click();
   await expect(page.getByTestId('model-svg').locator('text', { hasText: 'FRENTE_CAJON' }).first()).toBeVisible();
   await expect(page.getByTestId('model-svg').locator('text', { hasText: 'COSTADO_CAJON' })).toHaveCount(0);
@@ -264,7 +265,7 @@ test('cajones: cajas calculadas, cajón + puertas y etiquetas sin encimarse', as
 test('ajustes: códigos en español por defecto y opción de inglés técnico', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('family-kitchen_base').click();
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO');
   await expect(page.getByTestId('parts-table')).not.toContainText('M01-SIDE');
   const url = page.url();
@@ -273,11 +274,33 @@ test('ajustes: códigos en español por defecto y opción de inglés técnico', 
   await expect(page.getByTestId('lang-es')).toHaveAttribute('aria-checked', 'true');
   await page.getByTestId('lang-en').click();
   await page.goto(url);
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.getByTestId('parts-table')).toContainText('M01-SIDE');
   await page.goto('/ajustes');
   await page.getByTestId('lang-es').click();
   await page.goto(url);
-  await page.getByTestId('tab-parts').click();
+  await openTab(page, 'parts');
   await expect(page.getByTestId('parts-table')).toContainText('M01-COSTADO');
+});
+
+test('plan de corte único, instructivo ilustrado y sin desbordes en tableta', async ({ page }) => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.goto('/');
+  await page.getByTestId('family-kitchen_base_drawer').click();
+  await page.waitForURL(/editor/);
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(await overflow()).toBeLessThanOrEqual(0);
+  await openTab(page, 'cut');
+  await expect(page.getByTestId('cut-plan').locator('svg')).toHaveCount(1);
+  await expect(page.getByTestId('cut-plan')).toContainText('Tablero 1 de');
+  await expect(page.getByTestId('cut-plan')).toContainText('Piezas');
+  const [svg] = await Promise.all([page.waitForEvent('download'), page.getByTestId('download-cut-plan').click()]);
+  expect(svg.suggestedFilename()).toMatch(/plan-de-corte\.svg$/);
+  await openTab(page, 'assembly');
+  await expect(page.getByTestId('assembly-step').first()).toBeVisible();
+  expect(await page.getByTestId('assembly-step').count()).toBeGreaterThanOrEqual(6);
+  await expect(page.getByTestId('assembly-step').first()).toContainText('Une los costados al piso');
+  expect(await overflow()).toBeLessThanOrEqual(0);
+  await page.setViewportSize({ width: 1024, height: 1366 });
+  expect(await overflow()).toBeLessThanOrEqual(0);
 });

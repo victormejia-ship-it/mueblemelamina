@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { openTab } from '../e2e/nav';
 
 const stamp = Date.now().toString(36);
 
@@ -25,17 +26,17 @@ test('Firebase: cuenta, proyecto en Firestore, guardado, revisión, exportación
   await expect(page.getByTestId('model-svg')).toContainText('900 mm · ANCHO');
   await expect(page.getByTestId('save-state')).toHaveText('Guardado', { timeout: 10_000 });
 
-  await page.getByTestId('tab-history').click();
+  await openTab(page, 'history');
   await page.getByTestId('revision-note').fill('Rev Firebase');
   await page.getByTestId('create-revision').click();
   await expect(page.getByRole('cell', { name: 'Rev Firebase' })).toBeVisible();
 
   // Ofertas demo cargadas para la cuenta y cotización incompleta
-  await page.getByTestId('tab-quote').click();
+  await openTab(page, 'quote');
   await expect(page.getByTestId('quote-status')).toHaveText('INCOMPLETO');
 
   // Exportación generada en el navegador
-  await page.getByTestId('tab-export').click();
+  await openTab(page, 'export');
   const [csv] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-parts-csv').click()]);
   const text = await readFile((await csv.path())!, 'utf8');
   expect(text.charCodeAt(0)).toBe(0xfeff);

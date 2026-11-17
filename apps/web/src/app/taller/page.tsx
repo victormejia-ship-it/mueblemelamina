@@ -19,7 +19,7 @@ export default function TallerPage() {
       <section><h2 className="mb-2 text-[16px] font-bold">Ruta</h2><RouteFlow stations={stations} /></section>
       <section>
         <h2 className="mb-2 text-[16px] font-bold">Equipo</h2>
-        <div className="grid gap-3 md:grid-cols-2">{EQUIPMENT.map((e) => <EquipmentCard key={e.id} item={e} />)}</div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{EQUIPMENT.map((e) => <EquipmentCard key={e.id} item={e} />)}</div>
       </section>
     </div>
     </SampleModelProvider>

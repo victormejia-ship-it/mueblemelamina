@@ -33,10 +33,9 @@ export async function exportInBrowser(project: Project, offers: SupplierOffer[],
     case 'checks-csv': return saveBlob(ex.checksCsv(plan, sep, lang), 'text/csv;charset=utf-8', `${base}-verificacion.csv`);
     case 'svg': return saveBlob(ex.projectSvg(project, plan, DEFAULT_CATALOG, { view: opts.view ?? 'iso', exploded: !!opts.exploded, showIds: !!opts.exploded, lang }), 'image/svg+xml', `${base}-${opts.view ?? 'iso'}.svg`);
     case 'cut-svg': {
-      const maps = ex.cutMapsSvg(plan, lang);
-      if (!maps.length) throw new Error('No hay acomodo de corte disponible');
-      const i = Math.max(0, Math.min(maps.length - 1, (opts.sheet ?? 1) - 1));
-      return saveBlob(maps[i]!, 'image/svg+xml', `${base}-corte-${i + 1}.svg`);
+      if (!plan.nesting.some((n) => n.layout?.sheets.length)) throw new Error('No hay acomodo de corte disponible');
+      const g = await import('@ms/geometry');
+      return saveBlob(g.cutPlanSvg(plan.nesting, plan.calc.parts, { title: project.name, lang }), 'image/svg+xml', `${base}-plan-de-corte.svg`);
     }
     case 'mermaid': return saveBlob(ex.projectMermaid(project, plan, lang), 'text/plain;charset=utf-8', `${base}-armado.mmd`);
     case 'pdf': {

@@ -39,11 +39,15 @@ export interface Placement {
   rotated: boolean;
 }
 
+export interface Offcut { x: number; y: number; w: number; h: number }
+
 export interface SheetLayout {
   index: number;
   placements: Placement[];
   usedAreaMm2: number;
   utilization: number;
+  /** Rectángulos libres que quedan tras los cortes (guillotina: no se enciman), ya sin el kerf. */
+  offcuts: Offcut[];
 }
 
 export interface CutLayoutResult {
@@ -88,7 +92,7 @@ export function optimizeSheets(pieces: CutPiece[], sheet: SheetSpec, maxSheets =
   const sheets: { free: FreeRect[]; layout: SheetLayout }[] = [];
   const unplaced: CutLayoutResult['unplaced'] = [];
   const newSheet = () => {
-    const s = { free: [{ x: sheet.trimMarginMm, y: sheet.trimMarginMm, w: usableW + k, h: usableH + k }], layout: { index: sheets.length + 1, placements: [], usedAreaMm2: 0, utilization: 0 } as SheetLayout };
+    const s = { free: [{ x: sheet.trimMarginMm, y: sheet.trimMarginMm, w: usableW + k, h: usableH + k }], layout: { index: sheets.length + 1, placements: [], usedAreaMm2: 0, utilization: 0, offcuts: [] } as SheetLayout };
     sheets.push(s);
     return s;
   };
@@ -117,6 +121,10 @@ export function optimizeSheets(pieces: CutPiece[], sheet: SheetSpec, maxSheets =
 
   const layouts = sheets.map((s) => {
     s.layout.utilization = Math.round((s.layout.usedAreaMm2 / (sheet.lengthMm * sheet.widthMm)) * 1000) / 1000;
+    s.layout.offcuts = s.free
+      .map((f) => ({ x: f.x, y: f.y, w: Math.round((f.w - k) * 10) / 10, h: Math.round((f.h - k) * 10) / 10 }))
+      .filter((f) => f.w >= 50 && f.h >= 50)
+      .sort((a, b) => b.w * b.h - a.w * a.h);
     return s.layout;
   });
   return {
