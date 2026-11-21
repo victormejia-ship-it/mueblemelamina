@@ -182,6 +182,17 @@ export const EQUIPMENT: EquipmentItem[] = [
     alternatives: ['Router CNC con programa validado', 'Perfil LED de sobreponer (sin ranura)', 'Sierra de mesa con disco de ranurar (sólo ranuras pasantes)'],
     consumables: ['Fresa recta de carburo 6–12 mm', 'Cinta de pintor para evitar astillado', 'Perfil de prueba'],
   },
+  {
+    id: 'sierra-copa', name: 'Broca sierra copa Ø60 mm (contactos y pasacables)', category: 'mecanizado', station: 'mecanizado',
+    purpose: 'Perforar los barrenos pasados de contactos de mueble y pasacables.',
+    steps: ['Marcar centro', 'Broca guía', 'Perforar mitad', 'Voltear y terminar'],
+    ppe: ['gafas', 'respirador'],
+    keySettings: ['Ø de la broca = Ø del contacto o pasacables comprado (normalmente 60 mm)', 'Perforar por las dos caras para no astillar la melamina', 'Barreno a 70 mm del canto trasero (deja paso al respaldo)'],
+    safety: ['Gafas', 'Pieza sujeta con prensas', EPP_POLVO],
+    qualityChecks: ['El contacto entra a presión y queda al ras', 'Sin astillado en ninguna cara'],
+    alternatives: ['Router con plantilla circular', 'Caladora con disco guía'],
+    consumables: ['Broca sierra copa Ø60 con broca guía'],
+  },
   // --- Armado ---
   {
     id: 'atornillador', name: 'Taladro atornillador inalámbrico con embrague', category: 'armado', station: 'armado',
@@ -285,6 +296,17 @@ export const EQUIPMENT: EquipmentItem[] = [
     qualityChecks: ['Módulos a nivel y a plomo', 'Frentes alineados entre módulos'],
     alternatives: ['Manguera de nivel'],
     consumables: [],
+  },
+  {
+    id: 'probador-electrico', name: 'Probador de contactos y desarmadores aislados', category: 'instalación', station: 'instalacion',
+    purpose: 'Comprobar polaridad y tierra de los contactos del mueble después de conectarlos.',
+    steps: ['Cortar corriente', 'Conectar', 'Probar contacto', 'Probar luces'],
+    ppe: ['gafas'],
+    keySettings: ['Lo conecta un electricista a 127 V con tierra física', 'El cable no debe quedar tenso ni prensado por cajones o puertas'],
+    safety: ['Trabajar sin corriente', 'Herramienta con mango aislado'],
+    qualityChecks: ['Probador indica polaridad y tierra correctas', 'Luces y USB encienden'],
+    alternatives: ['Multímetro'],
+    consumables: ['Cinchos', 'Grapas para cable'],
   },
   {
     id: 'rotomartillo', name: 'Rotomartillo / taladro percutor y detector de instalaciones', category: 'instalación', station: 'instalacion',

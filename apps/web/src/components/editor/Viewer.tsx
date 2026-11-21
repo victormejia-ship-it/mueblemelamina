@@ -71,7 +71,8 @@ export function Viewer({ project, calc, selected, onSelect, focus = null }: { pr
         </svg>
       </div>
       </>}
-      {view !== 'render' && <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {t(selected)}</span>}{calc.ledRuns.length > 0 && <span className="flex items-center gap-1 rounded-full bg-[#2b3a24] px-2 py-0.5 font-semibold text-[#ffe27a]" data-testid="led-legend"><span className="h-[3px] w-4 rounded bg-[#ffd84d]" />Ranura LED (router) · {calc.ledRuns.length}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un plano CNC. Para ver cómo se vería, usa «Render».</Hint></div>}
+      {view !== 'render' && <div className="flex flex-wrap items-center gap-2 text-[12px]">{selected && <span className="rounded-full bg-[#2b4252] px-2 py-0.5 font-semibold">Pieza: {t(selected)}</span>}{calc.modules.some((m) => m.fixtures?.some((f) => f.kind === 'outlet' || f.kind === 'grommet')) && <span className="flex items-center gap-1 rounded-full bg-[#2b3a24] px-2 py-0.5 font-semibold text-[#ffe27a]" data-testid="power-legend"><span className="h-2.5 w-2.5 rounded-sm bg-[#ffd84d]" />⚡ {calc.modules.reduce((n, m) => n + (m.fixtures ?? []).filter((f) => f.kind === 'outlet').length, 0)} contacto(s) · {calc.modules.reduce((n, m) => n + (m.fixtures ?? []).filter((f) => f.kind === 'grommet').length, 0)} pasacables</span>}
+          {calc.ledRuns.length > 0 && <span className="flex items-center gap-1 rounded-full bg-[#2b3a24] px-2 py-0.5 font-semibold text-[#ffe27a]" data-testid="led-legend"><span className="h-[3px] w-4 rounded bg-[#ffd84d]" />Ranura LED (router) · {calc.ledRuns.length}</span>}<Hint>Toca una pieza para seleccionarla. El dibujo sale de las mismas medidas del despiece; es un esquema, no un plano CNC. Para ver cómo se vería, usa «Render».</Hint></div>}
     </div>
   );
 }

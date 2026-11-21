@@ -33,7 +33,37 @@ export type FrontType = 'open' | 'doors' | 'drawers' | 'drawer_doors';
 /** equal: frentes iguales; graduated: más chicos arriba y más altos abajo. */
 export type DrawerLayout = 'equal' | 'graduated';
 export type ConstructionStrategy = 'top_bottom_between_sides' | 'sides_between_top_bottom';
-export type BaseType = 'none' | 'plinth' | 'levelers' | 'steel_frame';
+export type BaseType = 'none' | 'plinth' | 'levelers' | 'steel_frame' | 'legs';
+
+/** Espejo sobre el mueble (peinadores, baños): se compra en vidriería; aquí se dimensiona y se ilumina. */
+export interface MirrorSpec {
+  enabled: boolean;
+  widthMm: Mm;
+  heightMm: Mm;
+  /** Separación entre la cubierta del mueble y el borde inferior del espejo. */
+  gapMm: Mm;
+  light: 'none' | 'backlit' | 'hollywood';
+}
+
+/** Conexión eléctrica integrada al mueble. */
+export interface PowerSpec {
+  /** Contactos dobles para mueble (Ø60). */
+  outlets: number;
+  /** Contactos con puertos USB. */
+  usb: boolean;
+  /** Pasacables Ø60 con tapa. */
+  grommets: number;
+}
+
+/** Accesorio que no es tablero pero se dibuja: patas, espejo, focos, contactos, pasacables. */
+export interface Fixture {
+  id: string;
+  moduleId: string;
+  kind: 'leg' | 'mirror' | 'mirror_glow' | 'bulb' | 'outlet' | 'grommet' | 'cable_exit';
+  /** Coordenadas del módulo (mm). */
+  b: Box3;
+  label: string;
+}
 export type Joinery = 'cam' | 'dowel' | 'screw' | 'mixed';
 export type EdgePolicy = 'front_visible_only' | 'all_visible' | 'none';
 export type MountType = 'floor' | 'wall';
@@ -48,6 +78,12 @@ export interface FamilyDefaults {
   drawerLayout?: DrawerLayout;
   shelvesPerBay: number;
   baseType: BaseType;
+  /** Opcionales por familia: acabado, espejo, conexión eléctrica, altura de flotante y acabado de herrería. */
+  finishId?: string;
+  mirror?: MirrorSpec;
+  power?: PowerSpec;
+  elevationMm?: Mm;
+  steelFinish?: SteelFrameSpec['finish'];
   baseHeightMm: Mm;
   mount: MountType;
   /** Carga de diseño sobre entrepaños/cubierta (kg/m²) para el cálculo de flecha. */
@@ -106,7 +142,7 @@ export type HardwareCategory =
   | 'hinge' | 'drawer_slide' | 'cam_connector' | 'dowel' | 'shelf_pin' | 'handle' | 'leveler'
   | 'screw' | 'wall_anchor' | 'hanging_rail' | 'hanging_rail_support' | 'soft_close' | 'lift_system'
   | 'plinth_clip' | 'adhesive'
-  | 'led_strip' | 'led_profile' | 'led_driver' | 'led_sensor' | 'led_cable';
+  | 'led_strip' | 'led_profile' | 'led_driver' | 'led_sensor' | 'led_cable' | 'power' | 'mirror' | 'leg';
 
 export interface HingeRule { maxDoorHeightMm: Mm; hingesPerDoor: number }
 
@@ -242,6 +278,12 @@ export interface ModuleSpec {
   frontGapMm: Mm;
   /** Iluminación LED empotrada (ranura de router + perfil de aluminio). */
   led: LedSpec;
+  /** Espejo sobre el mueble. */
+  mirror: MirrorSpec;
+  /** Conexión eléctrica integrada. */
+  power: PowerSpec;
+  /** Muebles a muro: altura del piso al fondo del mueble; null = altura de referencia. */
+  elevationMm: Mm | null;
 }
 
 export type ProjectStatus = 'DRAFT_NOT_RELEASED_FOR_MANUFACTURING' | 'RELEASED_WITH_APPROVAL';
@@ -477,6 +519,8 @@ export interface ModuleResult {
   weightKg: number;
   /** Tramos de LED empotrado (ranuras de router). */
   ledRuns: LedRun[];
+  /** Patas, espejo, focos y puntos eléctricos. */
+  fixtures: Fixture[];
 }
 
 export interface EdgeBandTotal {

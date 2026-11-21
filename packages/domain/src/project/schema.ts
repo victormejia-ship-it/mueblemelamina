@@ -29,8 +29,8 @@ export const ModuleSpecSchema = z.object({
   drawerLayout: z.enum(['equal', 'graduated']).default('equal'),
   shelvesPerBay: z.number().int().min(0).max(12),
   dividerCount: z.number().int().min(0).max(10).nullable(),
-  baseType: z.enum(['none', 'plinth', 'levelers', 'steel_frame']),
-  baseHeightMm: mm.min(0).max(400),
+  baseType: z.enum(['none', 'plinth', 'levelers', 'steel_frame', 'legs']),
+  baseHeightMm: mm.min(0).max(1200),
   mount: z.enum(['floor', 'wall']),
   // Campo agregado después de 1.0.0: los proyectos guardados sin él usan la carga de la familia.
   shelfLoadKgM2: z.number().min(0).max(500).nullable().default(null),
@@ -53,6 +53,13 @@ export const ModuleSpecSchema = z.object({
     profileProductId: z.string(),
     sensor: z.enum(['none', 'door', 'hand', 'touch']),
   }).default({ placement: 'none', stripProductId: 'led-strip-cob-12v', profileProductId: 'led-profile-embed-17', sensor: 'none' }),
+  // Campos agregados después de 1.0.0: sin espejo, sin conexión eléctrica y altura de referencia.
+  mirror: z.object({
+    enabled: z.boolean(), widthMm: posMm.max(3000), heightMm: posMm.max(3000), gapMm: mm.min(0).max(1500),
+    light: z.enum(['none', 'backlit', 'hollywood']),
+  }).default({ enabled: false, widthMm: 800, heightMm: 700, gapMm: 200, light: 'none' }),
+  power: z.object({ outlets: z.number().int().min(0).max(6), usb: z.boolean(), grommets: z.number().int().min(0).max(6) }).default({ outlets: 0, usb: false, grommets: 0 }),
+  elevationMm: mm.min(0).max(3000).nullable().default(null),
 });
 
 export const PricingSchema = z.object({

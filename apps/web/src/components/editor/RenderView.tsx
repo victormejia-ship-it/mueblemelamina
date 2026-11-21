@@ -95,7 +95,8 @@ function buildModel(ctx: Ctx, rm: RenderModel, doorsOpen: boolean, fresh: boolea
     let m = mats.get(key);
     if (!m) {
       const color = new T.Color(r.material.color);
-      m = r.material.kind === 'led' ? new T.MeshStandardMaterial({ color, roughness: 0.3, emissive: new T.Color('#ffc978'), emissiveIntensity: ledOn ? 4 : 0.02 })
+      m = r.material.kind === 'mirror' ? new T.MeshStandardMaterial({ color, metalness: 0.65, roughness: 0.07, emissive: new T.Color('#3c5058'), emissiveIntensity: 0.35 })
+        : r.material.kind === 'led' ? new T.MeshStandardMaterial({ color, roughness: 0.3, emissive: new T.Color('#ffc978'), emissiveIntensity: ledOn ? 4 : 0.02 })
         : r.material.kind === 'handle' ? new T.MeshStandardMaterial({ color, metalness: 0.9, roughness: 0.28 })
         : r.material.kind === 'steel' ? new T.MeshStandardMaterial({ color, metalness: 0.55, roughness: 0.45 })
         : new T.MeshStandardMaterial({ color, roughness: r.material.grain ? 0.62 : 0.5, metalness: 0, map: r.material.grain ? grain : null });
@@ -300,7 +301,7 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
       <div ref={host} className="relative min-h-[300px] overflow-hidden rounded-xl bg-[#e9e6e0]">
         {!ready && <div className="absolute inset-0 flex items-center justify-center text-[13px] text-[#55636f]">Preparando render…</div>}
       </div>
-      <p className="text-[12px] text-muted">Arrastra para girar · pellizca o rueda para acercar. {finish ? 'El acabado de prueba no cambia el proyecto.' : ''} Jaladeras ilustrativas.{rm.wallMounted ? ' Muebles a muro a altura de referencia (aéreos de cocina 1450 mm, flotantes 450 mm).' : ''}</p>
+      <p className="text-[12px] text-muted">Arrastra para girar · pellizca o rueda para acercar. {finish ? 'El acabado de prueba no cambia el proyecto.' : ''} Jaladeras ilustrativas.{rm.wallMounted ? ' Muebles a muro a su altura capturada o de referencia.' : ''}</p>
     </div>
   );
 }

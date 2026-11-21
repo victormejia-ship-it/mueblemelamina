@@ -22,7 +22,7 @@ export function calculateProject(project: Project, catalog: Catalog): ProjectCal
       res = {
         moduleId: spec.id, offsetXMm: x, offsetYMm: 0, fabricable: false, parts: [], hardware: [], machining: [], steel: [],
         issues: [{ code: 'MODULE_CALC_FAILED', severity: 'error', moduleId: spec.id, message: `No se pudo calcular ${spec.label}: ${(e as Error).message}` }],
-        theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, checks: [], weightKg: 0, ledRuns: [],
+        theoreticalDiagonalMm: null, carcassDepthMm: null, overallHeightMm: spec.heightMm, checks: [], weightKg: 0, ledRuns: [], fixtures: [],
       };
     }
     res.offsetYMm = r2(maxDepth - spec.depthMm);

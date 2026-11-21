@@ -33,7 +33,7 @@ const LED_LABEL: Record<Exclude<ModuleSpec['led']['placement'], 'none'>, string>
 };
 
 /** Separa una colocación de una pieza en su propio modelo de corte (p. ej. sólo el piso lleva ranura). */
-function splitPlacement(b: ModuleBuilder, part: PanelPart, placement: Box3, code: string, name: string): PanelPart {
+export function splitPlacement(b: ModuleBuilder, part: PanelPart, placement: Box3, code: string, name: string): PanelPart {
   if (part.placements.length === 1) return part;
   part.placements = part.placements.filter((p) => p !== placement);
   part.quantity = part.placements.length;

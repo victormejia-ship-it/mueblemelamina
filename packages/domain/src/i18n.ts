@@ -23,6 +23,8 @@ export const PART_CODE_ES: Record<string, string> = {
   DESK_MODESTY: 'FALDON',
   BOTTOM_LED: 'PISO_LED',
   TOP_LED: 'TAPA_LED',
+  TOP_POWER: 'TAPA_ELECTRICA',
+  SIDE_POWER: 'COSTADO_ELECTRICO',
 };
 
 // Códigos más largos primero para que DRAWER_SIDE gane sobre SIDE.
@@ -58,6 +60,9 @@ export const PATTERN_LABEL_ES: Record<string, string> = {
   'slide-mount': 'Fijación de corredera',
   'led-groove-router': 'Ranura LED (router)',
   'led-cable-channel': 'Canal de cable LED',
+  'power-outlet': 'Contacto (sierra copa)',
+  'power-grommet': 'Pasacables (sierra copa)',
+  'power-cable-exit': 'Salida de cable',
 };
 export const patternLabel = (id: string, lang: CodeLang = 'es') => (lang === 'en' ? id : PATTERN_LABEL_ES[id] ?? id);
 
@@ -72,6 +77,7 @@ export const HW_CATEGORY_ES: Record<string, string> = {
   leveler: 'Pata niveladora', screw: 'Tornillo', wall_anchor: 'Anclaje a muro', hanging_rail: 'Tubo de colgar', hanging_rail_support: 'Soporte de tubo',
   soft_close: 'Cierre suave', lift_system: 'Sistema abatible', plinth_clip: 'Clip de zoclo', adhesive: 'Adhesivo',
   led_strip: 'Tira LED', led_profile: 'Perfil LED', led_driver: 'Fuente LED', led_sensor: 'Sensor LED', led_cable: 'Cable LED',
+  power: 'Eléctrico', mirror: 'Espejo', leg: 'Pata',
 };
 export const hwCategoryLabel = (c: string, lang: CodeLang = 'es') => (lang === 'en' ? c : HW_CATEGORY_ES[c] ?? c);
 export const VALIDATION_ES: Record<string, string> = { verified: 'Verificado', pending_validation: 'Pendiente de validación', blocked: 'Bloqueado' };

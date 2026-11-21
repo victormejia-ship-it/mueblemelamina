@@ -4,6 +4,7 @@ export * from './catalog';
 export * from './engine/helpers';
 export * from './engine/module';
 export * from './engine/led';
+export * from './engine/fixtures';
 export * from './engine/project';
 export * from './engine/nesting';
 export * from './engine/assembly';

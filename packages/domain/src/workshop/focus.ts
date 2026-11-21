@@ -70,6 +70,13 @@ export function equipmentFocus(equipmentId: string, calc: ProjectCalculation): M
       const partIds = [...new Set(runs.map((r) => r.partId))];
       return { ...base, partIds, labels, led: true, note: `Líneas amarillas = ranuras para LED (${plural(runs.length, 'tramo', 'tramos')}, ${Math.round(runs.reduce((t, r) => t + r.lengthMm, 0) / 10) / 100} m).`, empty: runs.length === 0 };
     }
+    case 'sierra-copa': {
+      const m = new Map<string, number>();
+      for (const o of calc.machining.filter((x) => x.patternId === 'power-outlet' || x.patternId === 'power-grommet')) m.set(o.partId, (m.get(o.partId) ?? 0) + 1);
+      const labels: Record<string, string> = {};
+      for (const [id, n] of m) labels[id] = `${plural(n, 'barreno', 'barrenos')} Ø60`;
+      return { ...base, partIds: [...m.keys()], labels, note: 'Amarillo = contacto, negro = pasacables. Barreno pasado Ø60 mm.', empty: m.size === 0 };
+    }
     case 'prensas': case 'atornillador':
       return { ...base, partIds: ids((p) => ROLES.carcass.includes(p.role)), note: 'Caja: costados, tapa, piso, divisores y respaldo que se unen a escuadra.' };
     case 'medidor-diagonales':
@@ -84,7 +91,7 @@ export function equipmentFocus(equipmentId: string, calc: ProjectCalculation): M
     }
     case 'nivel': {
       const b = ids((p) => p.role === 'plinth');
-      return { ...base, partIds: b.length ? b : ids((p) => p.code === 'HORIZONTAL' || p.code === 'DESK_SIDE'), note: b.length ? 'Zoclo que se nivela en obra.' : 'Base de la caja: nivelar patas o apoyo.' };
+      return { ...base, partIds: b.length ? b : ids((p) => ['HORIZONTAL', 'TOP_POWER', 'DESK_SIDE'].includes(p.code)), note: b.length ? 'Zoclo que se nivela en obra.' : 'Base de la caja: nivelar patas o apoyo.' };
     }
     case 'rotomartillo': {
       const backs = ids((p) => p.role === 'back');

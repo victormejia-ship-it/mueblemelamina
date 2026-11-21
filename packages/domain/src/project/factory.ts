@@ -1,6 +1,6 @@
 import { catalogLookup, type Catalog } from '../catalog';
 import { defaultMarket } from '../pricing/market';
-import { SCHEMA_VERSION, type ManufacturingSettings, type LedSpec, type ModuleSpec, type PricingSettings, type Project } from '../types';
+import { SCHEMA_VERSION, type ManufacturingSettings, type LedSpec, type MirrorSpec, type ModuleSpec, type PowerSpec, type PricingSettings, type Project } from '../types';
 
 /** Valores de taller por defecto (editables por proyecto). */
 export const DEFAULT_MANUFACTURING: ManufacturingSettings = {
@@ -39,6 +39,9 @@ export function defaultPricing(): PricingSettings {
   };
 }
 
+export const DEFAULT_MIRROR: MirrorSpec = { enabled: false, widthMm: 800, heightMm: 700, gapMm: 200, light: 'none' };
+export const DEFAULT_POWER: PowerSpec = { outlets: 0, usb: false, grommets: 0 };
+
 export const DEFAULT_LED: LedSpec = { placement: 'none', stripProductId: 'led-strip-cob-12v', profileProductId: 'led-profile-embed-17', sensor: 'none' };
 
 /** Crea un módulo con los valores por defecto de la familia. */
@@ -56,7 +59,7 @@ export function createModule(familyId: string, catalog: Catalog, id: string, lab
     thicknessMm: 18,
     materialId: familyId === 'bath_vanity' ? 'mel18rh' : 'mel18',
     backMaterialId: f.geometryStrategy === 'desk' ? null : wardrobe ? 'hdf6' : 'hdf3',
-    finishId: 'grafito',
+    finishId: f.defaults.finishId ?? 'grafito',
     edgeBandId: 'pvc19x045',
     edgePolicy: 'front_visible_only',
     construction: 'top_bottom_between_sides',
@@ -74,10 +77,13 @@ export function createModule(familyId: string, catalog: Catalog, id: string, lab
     hingeProductId: null,
     slideProductId: null,
     handleProductId: null,
-    steel: { enabled: false, profileId: 'ptr1x1c14', legHeightMm: 100, finish: 'powder_coating' },
+    steel: { enabled: false, profileId: 'ptr1x1c14', legHeightMm: 100, finish: f.defaults.steelFinish ?? 'powder_coating' },
     revealMm: 2,
     frontGapMm: 3,
     led: { ...DEFAULT_LED },
+    mirror: { ...(f.defaults.mirror ?? DEFAULT_MIRROR) },
+    power: { ...(f.defaults.power ?? DEFAULT_POWER) },
+    elevationMm: f.defaults.elevationMm ?? null,
   };
 }
 

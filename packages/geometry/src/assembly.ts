@@ -37,6 +37,22 @@ export function assemblyGuide(project: Project, calc: ProjectCalculation, catalo
     const keysOf = (p: PanelPart) => p.placements.map((_, i) => `${p.id}#${i + 1}`);
     const byCode = (pred: (code: string) => boolean) => m.parts.filter((p) => pred(p.code));
     const steelIds = m.steel.map((s) => s.id);
+    const fxKeys = (kinds: string[]) => (m.fixtures ?? []).filter((f) => kinds.includes(f.kind)).map((f) => f.id);
+    /** Contactos, pasacables y espejo: comunes a todos los muebles. */
+    const extrasSteps = () => {
+      const power = fxKeys(['outlet', 'grommet']);
+      const nOut = fxKeys(['outlet']).length, nGrom = fxKeys(['grommet']).length;
+      step('Coloca contactos y pasacables', power, Object.fromEntries(power.map((k) => [k, [0, 0, D * 0.7] as Shift])), {
+        hardware: [...(nOut ? [pl(nOut, 'contacto', 'contactos')] : []), ...(nGrom ? [pl(nGrom, 'pasacables', 'pasacables')] : [])],
+        tip: 'Conexión a 127 V por electricista, con tierra física.',
+      });
+      const mirror = fxKeys(['mirror', 'bulb']);
+      const mspec = spec.mirror;
+      step(mspec.light === 'hollywood' ? 'Cuelga el espejo y los focos' : 'Cuelga el espejo', mirror, Object.fromEntries(mirror.map((k) => [k, [0, -D, 0] as Shift])), {
+        hardware: [`Espejo ${mspec.widthMm} × ${mspec.heightMm}`, ...(mspec.light === 'hollywood' ? [pl(fxKeys(['bulb']).length, 'foco', 'focos')] : []), ...(mspec.light === 'backlit' ? ['LED detrás'] : [])],
+        tip: mspec.light !== 'none' ? 'Las luces se conectan antes de fijar el espejo.' : 'Nivela antes de fijar las grapas.',
+      });
+    };
     const shown: string[] = [];
     let n = 0;
     const step = (title: string, add: string[], shift: Record<string, Shift>, opts: { tip?: string; hardware?: string[]; pieces?: PanelPart[] } = {}) => {
@@ -59,14 +75,15 @@ export function assemblyGuide(project: Project, calc: ProjectCalculation, catalo
       step('Coloca el faldón', mod.flatMap(keysOf), Object.fromEntries(mod.flatMap(keysOf).map((k) => [k, [0, D, 0] as Shift])), { pieces: mod, tip: 'Da rigidez: no lo omitas.' });
       const top = byCode((c) => c === 'DESK_TOP');
       step('Coloca la cubierta', top.flatMap(keysOf), Object.fromEntries(top.flatMap(keysOf).map((k) => [k, [0, 0, D] as Shift])), { pieces: top, hardware: qty(hw, ['screw'], (q) => pl(q, 'tornillo', 'tornillos')) });
+      extrasSteps();
       continue;
     }
 
     // Caja: piso, costados, tapa…
-    const horiz = m.parts.filter((p) => ['HORIZONTAL', 'BOTTOM_LED', 'TOP_LED'].includes(p.code)).flatMap((p) => p.placements.map((b, i) => ({ key: `${p.id}#${i + 1}`, z: b.z0, p })));
+    const horiz = m.parts.filter((p) => ['HORIZONTAL', 'BOTTOM_LED', 'TOP_LED', 'TOP_POWER'].includes(p.code)).flatMap((p) => p.placements.map((b, i) => ({ key: `${p.id}#${i + 1}`, z: b.z0, p })));
     horiz.sort((a, b) => a.z - b.z);
     const bottom = horiz[0], top = horiz.length > 1 ? horiz[horiz.length - 1] : undefined;
-    const sides = byCode((c) => c === 'SIDE');
+    const sides = byCode((c) => c === 'SIDE' || c === 'SIDE_POWER');
     const sideKeys = sides.flatMap(keysOf);
     if (bottom) shown.push(bottom.key);
     step('Une los costados al piso', sideKeys, Object.fromEntries(sides.flatMap((p) => p.placements.map((b, i) => [`${p.id}#${i + 1}`, [b.x0 < spec.widthMm / 2 ? -D : D, 0, 0] as Shift]))), {
@@ -88,6 +105,10 @@ export function assemblyGuide(project: Project, calc: ProjectCalculation, catalo
     step(steelIds.length ? 'Monta el bastidor' : 'Arma y fija el zoclo', baseKeys, Object.fromEntries(baseKeys.map((k) => [k, [0, 0, -D * 0.8] as Shift])), {
       pieces: base, hardware: qty(hw, ['plinth_clip'], (q) => pl(q, 'clip', 'clips')),
     });
+    const legKeys = fxKeys(['leg']);
+    step('Atornilla las patas', legKeys, Object.fromEntries(legKeys.map((k) => [k, [0, 0, -D * 0.8] as Shift])), {
+      hardware: qty(hw, ['leg'], (q) => pl(q, 'pata', 'patas')), tip: 'Con el mueble boca abajo sobre una manta.',
+    });
     const shelves = byCode((c) => c === 'SHELF');
     step('Coloca los entrepaños', shelves.flatMap(keysOf), Object.fromEntries(shelves.flatMap(keysOf).map((k) => [k, [0, -D * 1.2, 0] as Shift])), {
       pieces: shelves, hardware: qty(hw, ['shelf_pin'], (q) => pl(q, 'soporte', 'soportes')).concat(qty(hw, ['hanging_rail'], (q) => `${q} m de tubo`)),
@@ -101,6 +122,7 @@ export function assemblyGuide(project: Project, calc: ProjectCalculation, catalo
       pieces: fronts, hardware: qty(hw, ['hinge'], (q) => pl(q, 'bisagra', 'bisagras')).concat(qty(hw, ['handle'], (q) => pl(q, 'jaladera', 'jaladeras'))),
       tip: fronts.length ? `Regula para dejar ${spec.frontGapMm} mm entre frentes.` : undefined,
     });
+    extrasSteps();
     // Instalación final (sin piezas nuevas): nivelar, anclar y LED
     const install = [
       ...qty(hw, ['leveler'], (q) => pl(q, 'pata niveladora', 'patas niveladoras')),

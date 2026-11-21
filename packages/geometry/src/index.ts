@@ -152,6 +152,11 @@ function colorsFor(part: { role: string } | null, finish: { top: string; front: 
     case 'plinth': return { top: shade(finish.top, -0.25), front: shade(finish.front, -0.25), side: shade(finish.side, -0.25) };
     case 'front': return { top: shade(finish.top, 0.08), front: shade(finish.front, 0.08), side: shade(finish.side, 0.08) };
     case 'steel': return { top: '#7d8a95', front: '#5f6b75', side: '#46515a' };
+    case 'fx_leg': return { top: '#d8b98f', front: '#c49a6c', side: '#a57b4f' };
+    case 'fx_mirror': return { top: '#e6f1f5', front: '#cfe3ea', side: '#a9c3cc' };
+    case 'fx_bulb': return { top: '#fff7d6', front: '#ffefb0', side: '#f2d98a' };
+    case 'fx_outlet': return { top: '#ffd84d', front: '#ffd84d', side: '#e0b62f' };
+    case 'fx_grommet': return { top: '#2b2f33', front: '#2b2f33', side: '#1b1e21' };
     default: return finish;
   }
 }
@@ -205,6 +210,7 @@ function idLabels(ordered: Solid[], polys: { key: string; pts: Pt[] }[], partsBy
   // Del frente hacia atrás: lo visible se etiqueta primero.
   for (let k = ordered.length - 1; k >= 0; k--) {
     const s = ordered[k]!;
+    if (s.role.startsWith('fx_')) continue;
     if (s.role === 'steel') { if (seenSteel.has(s.partId)) continue; seenSteel.add(s.partId); }
     const own = (idx.get(s.key) ?? []).map((i) => ({ i, a: polyArea(polys[i]!.pts) })).sort((a, b) => b.a - a.a);
     const part = partsById.get(s.partId);
@@ -232,6 +238,8 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   const width = opts.width ?? 900, height = opts.height ?? 640;
   const view = opts.view;
   const partsById = new Map<string, PanelPart>(calc.parts.map((p) => [p.id, p]));
+  // Muebles a muro con altura capturada (p. ej. peinador flotante): se dibujan a su altura real.
+  const zl = (moduleId: string) => { const sp = project.modules.find((x) => x.id === moduleId); return sp?.mount === 'wall' ? sp.elevationMm ?? 0 : 0; };
   const solids: Solid[] = [];
   calc.modules.forEach((m, mi) => {
     const spec = project.modules.find((s) => s.id === m.moduleId);
@@ -246,7 +254,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     for (const p of parts) {
       p.placements.forEach((pl, i) => {
         const b0 = opts.exploded ? explodeBox(pl, center, d) : pl;
-        const b = { x0: b0.x0 + dx, x1: b0.x1 + dx, y0: b0.y0 + m.offsetYMm, y1: b0.y1 + m.offsetYMm, z0: b0.z0, z1: b0.z1 };
+        const b = { x0: b0.x0 + dx, x1: b0.x1 + dx, y0: b0.y0 + m.offsetYMm, y1: b0.y1 + m.offsetYMm, z0: b0.z0 + zl(m.moduleId), z1: b0.z1 + zl(m.moduleId) };
         solids.push({ key: `${p.id}#${i + 1}`, partId: p.id, moduleId: m.moduleId, role: p.role, b });
       });
     }
@@ -254,6 +262,13 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   for (const s of steelSolids(project, calc)) {
     const m = calc.modules.find((x) => x.moduleId === s.moduleId)!;
     solids.push({ ...s, b: { ...s.b, x0: s.b.x0 + m.offsetXMm, x1: s.b.x1 + m.offsetXMm, y0: s.b.y0 + m.offsetYMm, y1: s.b.y1 + m.offsetYMm } });
+  }
+  // Patas, espejo, focos y puntos eléctricos (no son tablero; en despiece separado no se dibujan)
+  if (!opts.exploded) {
+    for (const m of calc.modules) for (const f of m.fixtures ?? []) {
+      if (f.kind === 'cable_exit' || f.kind === 'mirror_glow') continue;
+      solids.push({ key: f.id, partId: f.id, moduleId: m.moduleId, role: `fx_${f.kind}`, b: { ...f.b, x0: f.b.x0 + m.offsetXMm, x1: f.b.x1 + m.offsetXMm, y0: f.b.y0 + m.offsetYMm, y1: f.b.y1 + m.offsetYMm, z0: f.b.z0 + zl(m.moduleId), z1: f.b.z1 + zl(m.moduleId) } });
+    }
   }
 
   // Paso de armado: filtrar, desplazar lo que se agrega y preparar flechas
@@ -291,7 +306,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   }
 
   // Extensión total para cotas (sin explosión)
-  const real = calc.modules.flatMap((m) => m.parts.flatMap((p) => p.placements.map((b) => ({ ...b, x0: b.x0 + m.offsetXMm, x1: b.x1 + m.offsetXMm, y0: b.y0 + m.offsetYMm, y1: b.y1 + m.offsetYMm }))));
+  const real = calc.modules.flatMap((m) => m.parts.flatMap((p) => p.placements.map((b) => ({ ...b, x0: b.x0 + m.offsetXMm, x1: b.x1 + m.offsetXMm, y0: b.y0 + m.offsetYMm, y1: b.y1 + m.offsetYMm, z0: b.z0 + zl(m.moduleId), z1: b.z1 + zl(m.moduleId) }))));
   const ext = real.length
     ? { x0: Math.min(...real.map((b) => b.x0)), x1: Math.max(...real.map((b) => b.x1)), y0: Math.min(...real.map((b) => b.y0)), y1: Math.max(...real.map((b) => b.y1)), z0: Math.min(0, ...real.map((b) => b.z0)), z1: Math.max(...real.map((b) => b.z1)) }
     : { x0: 0, x1: 1, y0: 0, y1: 1, z0: 0, z1: 1 };
@@ -328,7 +343,7 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     for (const r of calc.ledRuns) {
       const m = calc.modules.find((x) => x.moduleId === r.moduleId);
       if (!m) continue;
-      const mv = (p: [number, number, number]): [number, number, number] => [p[0] + m.offsetXMm, p[1] + m.offsetYMm, p[2]];
+      const mv = (p: [number, number, number]): [number, number, number] => [p[0] + m.offsetXMm, p[1] + m.offsetYMm, p[2] + zl(m.moduleId)];
       extra3.push({ a: mv(r.a), b: mv(r.b), kind: 'led' });
     }
   }

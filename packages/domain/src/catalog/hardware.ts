@@ -73,6 +73,16 @@ export const HARDWARE: HardwareProduct[] = [
   { id: 'led-sensor-door', category: 'led_sensor', name: 'Sensor de apertura de puerta para LED 12 V', manufacturer: null, sku: null, productKey: 'hw:led_sensor_door', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'led-sensor-hand', category: 'led_sensor', name: 'Sensor de movimiento de mano (sin contacto) 12 V', manufacturer: null, sku: null, productKey: 'hw:led_sensor_hand', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'led-sensor-touch', category: 'led_sensor', name: 'Interruptor táctil con atenuador 12 V', manufacturer: null, sku: null, productKey: 'hw:led_sensor_touch', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  // Peinadores y conexión eléctrica
+  { id: 'wood-leg', category: 'leg', name: 'Pata cónica de madera con placa de fijación', manufacturer: null, sku: null, productKey: 'hw:wood_leg', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'mirror-4mm', category: 'mirror', name: 'Espejo 4 mm con canto pulido (vidriería)', manufacturer: null, sku: null, productKey: 'hw:mirror4mm', unit: 'm²', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'mirror-fix', category: 'mirror', name: 'Grapas y adhesivo para espejo', manufacturer: null, sku: null, productKey: 'hw:mirror_fix', unit: 'juego', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'bulb-g45', category: 'mirror', name: 'Foco LED G45 4 W 127 V con socket', manufacturer: null, sku: null, productKey: 'hw:bulb_g45', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'power-switch', category: 'power', name: 'Apagador para mueble 127 V', manufacturer: null, sku: null, productKey: 'hw:power_switch', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'power-outlet', category: 'power', name: 'Contacto doble para mueble Ø60 mm, 127 V con tierra', manufacturer: null, sku: null, productKey: 'hw:power_outlet', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'power-outlet-usb', category: 'power', name: 'Contacto para mueble Ø60 mm con 2 USB, 127 V', manufacturer: null, sku: null, productKey: 'hw:power_outlet_usb', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'grommet-60', category: 'power', name: 'Pasacables Ø60 mm con tapa', manufacturer: null, sku: null, productKey: 'hw:grommet60', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'power-cable', category: 'power', name: 'Cable uso rudo 3 × 14 AWG con clavija', manufacturer: null, sku: null, productKey: 'hw:power_cable', unit: 'm', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'led-cable-2x20', category: 'led_cable', name: 'Cable dúplex calibre 20 AWG + conectores', manufacturer: null, sku: null, productKey: 'hw:led_cable2x20', unit: 'm', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
 ];
 

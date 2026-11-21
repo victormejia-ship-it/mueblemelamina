@@ -148,7 +148,7 @@ test('página general del taller', async ({ page }) => {
 test('portada: catálogo con búsqueda, categorías y proyectos recientes', async ({ page }) => {
   await page.goto('/');
   const grid = page.getByTestId('catalog-grid');
-  await expect(grid.locator('li')).toHaveCount(21);
+  await expect(grid.locator('li')).toHaveCount(25);
   await expect(grid.locator('svg').first()).toBeVisible();
   await page.getByTestId('catalog-search').fill('closet');
   await expect(grid.locator('li')).toHaveCount(1);
@@ -303,4 +303,23 @@ test('plan de corte único, instructivo ilustrado y sin desbordes en tableta', a
   expect(await overflow()).toBeLessThanOrEqual(0);
   await page.setViewportSize({ width: 1024, height: 1366 });
   expect(await overflow()).toBeLessThanOrEqual(0);
+});
+
+test('peinadores y conexión eléctrica', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('catalog-search').fill('peinador');
+  await expect(page.getByTestId('catalog-grid').locator('li')).toHaveCount(4);
+  await page.getByTestId('family-vanity_hollywood').click();
+  await page.waitForURL(/editor/);
+  await expect(page.getByTestId('power-legend')).toContainText('1 contacto');
+  await expect(page.getByTestId('mod-mirror')).toHaveValue('hollywood');
+  // Agregar pasacables desde el formulario
+  await page.getByText('Conexión eléctrica').first().click();
+  await page.getByTestId('mod-grommets').fill('2');
+  await expect(page.getByTestId('power-legend')).toContainText('2 pasacables');
+  await openTab(page, 'assembly');
+  await expect(page.getByTestId('assembly-guide')).toContainText('Cuelga el espejo y los focos');
+  await expect(page.getByTestId('assembly-guide')).toContainText('Coloca contactos y pasacables');
+  await openTab(page, 'workshop');
+  await expect(page.getByTestId('equipment-sierra-copa')).toBeVisible();
 });
