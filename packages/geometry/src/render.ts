@@ -1,7 +1,7 @@
 import { DEFAULT_CATALOG, type Box3, type Catalog, type Project, type ProjectCalculation } from '@ms/domain';
 
 /** Material de una caja del render: color base y, si tiene veta, su dirección en el mundo. */
-export interface RenderMaterial { color: string; grain: boolean; kind: 'board' | 'back' | 'drawer' | 'steel' | 'handle' | 'led' }
+export interface RenderMaterial { color: string; grain: boolean; kind: 'board' | 'back' | 'drawer' | 'steel' | 'handle' | 'led' | 'mirror' }
 export interface RenderBox { key: string; partId: string; role: string; b: Box3; material: RenderMaterial; grainDir: 'x' | 'y' | 'z' | null; /** Tiras LED: hacia dónde ilumina (ejes del mueble). */ lightDir?: [number, number, number] }
 export interface RenderModel { boxes: RenderBox[]; bounds: Box3; wallMounted: boolean }
 
@@ -10,8 +10,8 @@ const HANDLE_LEN = 128, HANDLE_T = 12, HANDLE_OUT = 28;
 export const WALL_UNIT_BOTTOM_MM = 1450;
 /** Otros muebles a muro (cajón o buró flotante, repisas): fondo a esta altura de referencia. */
 export const FLOATING_BOTTOM_MM = 450;
-const liftFor = (spec: { mount: string; familyId: string } | undefined) =>
-  spec?.mount !== 'wall' ? 0 : spec.familyId.startsWith('kitchen') || spec.familyId === 'pantry' ? WALL_UNIT_BOTTOM_MM : FLOATING_BOTTOM_MM;
+const liftFor = (spec: { mount: string; familyId: string; elevationMm?: number | null } | undefined) =>
+  spec?.mount !== 'wall' ? 0 : spec.elevationMm ?? (spec.familyId.startsWith('kitchen') || spec.familyId === 'pantry' ? WALL_UNIT_BOTTOM_MM : FLOATING_BOTTOM_MM);
 
 /**
  * Datos para el render 3D (coordenadas en mm: x ancho, y fondo con el frente en y=0, z alto).
@@ -74,6 +74,22 @@ export function renderModel(project: Project, calc: ProjectCalculation, catalog:
       ? { x0: Math.min(r.a[0], r.a[0] + t) + ox, x1: Math.max(r.a[0], r.a[0] + t) + ox, y0: r.a[1] - hw + oy, y1: r.a[1] + hw + oy, z0: r.a[2] + lift, z1: r.b[2] + lift }
       : { x0: r.a[0] + ox, x1: r.b[0] + ox, y0: r.a[1] - hw + oy, y1: r.a[1] + hw + oy, z0: r.a[2] - 0.8 + lift, z1: r.a[2] + lift };
     boxes.push({ key: r.id, partId: r.partId, role: 'led', b, material: { color: '#ffe2a8', grain: false, kind: 'led' }, grainDir: null, lightDir: r.lightDir });
+  }
+  // Patas, espejo, focos y puntos eléctricos
+  for (const m of calc.modules) {
+    const spec = project.modules.find((s) => s.id === m.moduleId);
+    const lift = liftFor(spec);
+    for (const f of m.fixtures ?? []) {
+      if (f.kind === 'cable_exit') continue;
+      const b: Box3 = { x0: f.b.x0 + m.offsetXMm, x1: f.b.x1 + m.offsetXMm, y0: f.b.y0 + m.offsetYMm, y1: f.b.y1 + m.offsetYMm, z0: f.b.z0 + lift, z1: f.b.z1 + lift };
+      const mat: RenderMaterial =
+        f.kind === 'leg' ? { color: '#b88a5a', grain: true, kind: 'board' }
+        : f.kind === 'mirror' ? { color: '#eef4f6', grain: false, kind: 'mirror' }
+        : f.kind === 'bulb' || f.kind === 'mirror_glow' ? { color: '#fff1c9', grain: false, kind: 'led' }
+        : f.kind === 'outlet' ? { color: '#f2f2f2', grain: false, kind: 'steel' }
+        : { color: '#2b2f33', grain: false, kind: 'steel' };
+      boxes.push({ key: f.id, partId: f.id, role: f.kind, b, material: mat, grainDir: f.kind === 'leg' ? 'z' : null, ...(f.kind === 'bulb' ? { lightDir: [0, -1, 0] as [number, number, number] } : {}) });
+    }
   }
   // Herrería: patas y largueros esquemáticos
   for (const m of calc.modules) {

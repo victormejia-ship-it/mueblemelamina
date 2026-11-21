@@ -68,7 +68,7 @@ export const FAMILIES: FamilyDefinition[] = [
   {
     id: 'nightstand', name: 'Buró', category: 'bedroom', geometryStrategy: 'box', status: 'configurable_base_template',
     description: 'Caja pequeña con 1–3 cajones.',
-    defaults: d({ widthMm: 500, heightMm: 550, depthMm: 400, front: 'drawers', drawerCount: 2, shelvesPerBay: 0, baseType: 'plinth', baseHeightMm: 60 }),
+    defaults: d({ widthMm: 500, heightMm: 550, depthMm: 400, front: 'drawers', drawerCount: 2, shelvesPerBay: 0, baseType: 'plinth', baseHeightMm: 60, power: { outlets: 1, usb: true, grommets: 0 } }),
     pendingRules: [],
   },
   {
@@ -77,10 +77,39 @@ export const FAMILIES: FamilyDefinition[] = [
     defaults: d({ widthMm: 600, heightMm: 180, depthMm: 350, front: 'drawers', drawerCount: 1, shelvesPerBay: 0, mount: 'wall', shelfLoadKgM2: 20 }),
     pendingRules: ['Colgadores o riel oculto según el muro; validar carga con el cajón lleno.'],
   },
+  // Peinadores: cajón bajo cubierta + espejo; cuatro estilos modernos.
+  {
+    id: 'vanity_floating', name: 'Peinador minimalista flotante', category: 'bedroom', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Cajón a muro sin patas, cubierta a 76 cm y espejo con luz LED trasera. Contacto con USB para secadora y cargadores.',
+    defaults: d({ widthMm: 1000, heightMm: 200, depthMm: 420, front: 'drawers', drawerCount: 1, shelvesPerBay: 0, mount: 'wall', elevationMm: 560, shelfLoadKgM2: 20, finishId: 'blanco',
+      mirror: { enabled: true, widthMm: 800, heightMm: 700, gapMm: 250, light: 'backlit' }, power: { outlets: 1, usb: true, grommets: 0 } }),
+    pendingRules: ['Anclaje a muro según el tipo de muro; validar carga con el cajón lleno.'],
+  },
+  {
+    id: 'vanity_nordic', name: 'Peinador nórdico', category: 'bedroom', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Cajón sobre patas de madera, acabado roble y espejo sencillo.',
+    defaults: d({ widthMm: 1000, heightMm: 180, depthMm: 420, front: 'drawers', drawerCount: 1, shelvesPerBay: 0, baseType: 'legs', baseHeightMm: 580, shelfLoadKgM2: 20, finishId: 'roble',
+      mirror: { enabled: true, widthMm: 700, heightMm: 800, gapMm: 200, light: 'none' }, power: { outlets: 1, usb: true, grommets: 0 } }),
+    pendingRules: [],
+  },
+  {
+    id: 'vanity_industrial', name: 'Peinador industrial', category: 'bedroom', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Cajón en nogal sobre bastidor de PTR negro y espejo amplio.',
+    defaults: d({ widthMm: 1100, heightMm: 180, depthMm: 450, front: 'drawers', drawerCount: 1, shelvesPerBay: 0, baseType: 'steel_frame', baseHeightMm: 580, shelfLoadKgM2: 20, finishId: 'nogal', steelFinish: 'powder_coating',
+      mirror: { enabled: true, widthMm: 900, heightMm: 750, gapMm: 200, light: 'none' }, power: { outlets: 1, usb: true, grommets: 0 } }),
+    pendingRules: ['Bastidor de PTR: validar cargas y soldadura.'],
+  },
+  {
+    id: 'vanity_hollywood', name: 'Peinador Hollywood', category: 'bedroom', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Cajón blanco sobre patas y espejo con focos alrededor, como camerino.',
+    defaults: d({ widthMm: 1100, heightMm: 200, depthMm: 450, front: 'drawers', drawerCount: 1, shelvesPerBay: 0, baseType: 'legs', baseHeightMm: 560, shelfLoadKgM2: 20, finishId: 'blanco',
+      mirror: { enabled: true, widthMm: 900, heightMm: 800, gapMm: 150, light: 'hollywood' }, power: { outlets: 1, usb: true, grommets: 0 } }),
+    pendingRules: ['Focos a 127 V: instalación por electricista, con apagador.'],
+  },
   {
     id: 'desk', name: 'Escritorio', category: 'office', geometryStrategy: 'desk', status: 'verified_vertical',
     description: 'Cubierta, costados tipo panel y faldón; o cubierta sobre bastidor de PTR (requiere validación de cargas).',
-    defaults: d({ shelfLoadKgM2: 30, widthMm: 1400, heightMm: 750, depthMm: 600, front: 'open', shelvesPerBay: 0 }),
+    defaults: d({ shelfLoadKgM2: 30, widthMm: 1400, heightMm: 750, depthMm: 600, front: 'open', shelvesPerBay: 0, power: { outlets: 1, usb: true, grommets: 1 } }),
     pendingRules: [],
   },
   {
@@ -98,7 +127,7 @@ export const FAMILIES: FamilyDefinition[] = [
   {
     id: 'tv_console', name: 'Mueble de TV', category: 'living', geometryStrategy: 'box', status: 'configurable_base_template',
     description: 'Caja baja abierta o con puertas; versión flotante requiere anclaje calculado.',
-    defaults: d({ shelfLoadKgM2: 30, widthMm: 1600, heightMm: 500, depthMm: 400, front: 'open', shelvesPerBay: 1 }),
+    defaults: d({ shelfLoadKgM2: 30, widthMm: 1600, heightMm: 500, depthMm: 400, front: 'open', shelvesPerBay: 1, power: { outlets: 1, usb: false, grommets: 2 } }),
     pendingRules: ['Pasacables y ventilación de equipos pendientes.'],
   },
   {

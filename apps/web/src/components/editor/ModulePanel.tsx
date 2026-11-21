@@ -90,8 +90,9 @@ hint={fam.status === 'verified_vertical' ? '✓ Verificada' : fam.status === 'co
         {!isDesk && m.front !== 'drawers' && <NumberInput label={fam.geometryStrategy === 'wardrobe' ? 'Entrepaños (1 = maletero)' : 'Entrepaños por hueco'} value={m.shelvesPerBay} min={0} max={12} onChange={(v) => set('shelvesPerBay', Math.round(v))} testId="mod-shelves" />}
         {!isDesk && (m.front === 'doors' || m.front === 'drawer_doors') && <SelectInput label="Bisagra" value={m.hingeProductId ?? ''} onChange={(v) => set('hingeProductId', v || null)} options={[{ value: '', label: 'Genérica (pendiente de SKU)' }, ...hinges.map((h) => ({ value: h.id, label: h.name }))]} testId="mod-hinge" />}
         {!isDesk && (m.front === 'drawers' || m.front === 'drawer_doors') && <SelectInput label="Corredera" value={m.slideProductId ?? ''} onChange={(v) => set('slideProductId', v || null)} options={[{ value: '', label: 'Genérica (valores típicos)' }, ...slides.map((h) => ({ value: h.id, label: h.name }))]} testId="mod-slide" />}
-        {!isDesk && <SelectInput label="Base" value={m.baseType} onChange={(v) => set('baseType', v)} options={[{ value: 'none', label: 'Sin base' }, { value: 'plinth', label: 'Zoclo (bastidor)' }, { value: 'levelers', label: 'Patas niveladoras' }, { value: 'steel_frame', label: 'Bastidor PTR' }]} testId="mod-base" />}
-        {!isDesk && m.baseType !== 'none' && <NumberInput label="Altura de base" suffix="mm" value={m.baseHeightMm} min={0} max={400} onChange={(v) => set('baseHeightMm', v)} />}
+        {!isDesk && <SelectInput label="Base" value={m.baseType} onChange={(v) => set('baseType', v)} options={[{ value: 'none', label: 'Sin base' }, { value: 'plinth', label: 'Zoclo (bastidor)' }, { value: 'levelers', label: 'Patas niveladoras' }, { value: 'legs', label: 'Patas de madera' }, { value: 'steel_frame', label: 'Bastidor PTR' }]} testId="mod-base" />}
+        {!isDesk && m.mount === 'wall' && <NumberInput label="Altura del piso" suffix="mm" value={m.elevationMm ?? (m.familyId.startsWith('kitchen') ? 1450 : 450)} min={0} max={3000} onChange={(v) => set('elevationMm', v)} hint="Al fondo del mueble" testId="mod-elevation" />}
+        {!isDesk && m.baseType !== 'none' && <NumberInput label="Altura de base" suffix="mm" value={m.baseHeightMm} min={0} max={1200} onChange={(v) => set('baseHeightMm', v)} />}
         {isDesk && <SelectInput label="Estructura" value={m.steel.enabled ? 'steel' : 'panel'} onChange={(v) => set('steel', { ...m.steel, enabled: v === 'steel' })} options={[{ value: 'panel', label: 'Costados tipo panel' }, { value: 'steel', label: 'Bastidor de PTR' }]} testId="mod-desk-structure" />}
       </div>
       <More summary={m.led.placement === 'none' ? 'Iluminación LED' : `Iluminación LED · ${LED_PLACES.find((x) => x.value === m.led.placement)?.label ?? ''}`}>
@@ -104,6 +105,25 @@ hint={fam.status === 'verified_vertical' ? '✓ Verificada' : fam.status === 'co
             <SelectInput label="Tipo de tira" value={m.led.stripProductId} onChange={(v) => set('led', { ...m.led, stripProductId: v })} options={ledStrips.map((h) => ({ value: h.id, label: h.name }))} />
             <SelectInput label="Perfil (ranura)" value={m.led.profileProductId} onChange={(v) => set('led', { ...m.led, profileProductId: v })} options={ledProfiles.map((h) => ({ value: h.id, label: h.name }))} />
           </>}
+        </div>
+      </More>
+      <More summary={m.mirror.enabled ? `Espejo · ${m.mirror.widthMm} × ${m.mirror.heightMm}` : 'Espejo'}>
+        <div className="grid grid-cols-2 gap-2">
+          <SelectInput label="Espejo" value={m.mirror.enabled ? m.mirror.light : 'off'} testId="mod-mirror"
+            onChange={(v) => set('mirror', v === 'off' ? { ...m.mirror, enabled: false } : { ...m.mirror, enabled: true, light: v })}
+            options={[{ value: 'off', label: 'Sin espejo' }, { value: 'none', label: 'Espejo sencillo' }, { value: 'backlit', label: 'Con luz LED trasera' }, { value: 'hollywood', label: 'Hollywood (focos)' }]} />
+          {m.mirror.enabled && <>
+            <NumberInput label="Ancho" suffix="mm" value={m.mirror.widthMm} min={100} max={3000} onChange={(v) => set('mirror', { ...m.mirror, widthMm: v })} />
+            <NumberInput label="Alto" suffix="mm" value={m.mirror.heightMm} min={100} max={3000} onChange={(v) => set('mirror', { ...m.mirror, heightMm: v })} />
+            <NumberInput label="Separación" suffix="mm" value={m.mirror.gapMm} min={0} max={1500} onChange={(v) => set('mirror', { ...m.mirror, gapMm: v })} hint="Sobre la cubierta" />
+          </>}
+        </div>
+      </More>
+      <More summary={m.power.outlets + m.power.grommets ? `Conexión eléctrica · ${m.power.outlets} contacto(s), ${m.power.grommets} pasacables` : 'Conexión eléctrica'}>
+        <div className="grid grid-cols-3 gap-2">
+          <NumberInput label="Contactos" value={m.power.outlets} min={0} max={6} onChange={(v) => set('power', { ...m.power, outlets: Math.round(v) })} testId="mod-outlets" />
+          <SelectInput label="USB" value={m.power.usb ? 'si' : 'no'} onChange={(v) => set('power', { ...m.power, usb: v === 'si' })} options={[{ value: 'no', label: 'Sin USB' }, { value: 'si', label: 'Con USB' }]} />
+          <NumberInput label="Pasacables" value={m.power.grommets} min={0} max={6} onChange={(v) => set('power', { ...m.power, grommets: Math.round(v) })} testId="mod-grommets" />
         </div>
       </More>
       <More summary="Cantos y respaldo">

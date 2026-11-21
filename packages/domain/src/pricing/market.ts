@@ -66,6 +66,15 @@ export const MARKET_REFERENCE_MTY: Record<string, MarketRef> = {
   'hw:led_sensor_hand': ref(140, 100, 200, 'pza'),
   'hw:led_sensor_touch': ref(160, 110, 230, 'pza'),
   'hw:led_cable2x20': ref(9, 6, 14, 'm'),
+  'hw:wood_leg': ref(190, 120, 320, 'pza', 'Pata cónica de pino/encino con placa.'),
+  'hw:mirror4mm': ref(650, 480, 900, 'm²', 'Espejo 4 mm con canto pulido, cortado en vidriería.'),
+  'hw:mirror_fix': ref(70, 40, 120, 'juego'),
+  'hw:bulb_g45': ref(55, 35, 90, 'pza', 'Foco LED G45 + socket.'),
+  'hw:power_switch': ref(90, 60, 140, 'pza'),
+  'hw:power_outlet': ref(230, 150, 350, 'pza', 'Contacto redondo para mueble Ø60.'),
+  'hw:power_outlet_usb': ref(340, 240, 520, 'pza'),
+  'hw:grommet60': ref(35, 20, 60, 'pza'),
+  'hw:power_cable': ref(24, 16, 35, 'm', 'Uso rudo 3 × 14 AWG + clavija.'),
 };
 
 /** Rango de precio de venta en Monterrey por metro lineal de frente (MXN sin IVA, instalado, melamina, sin cubierta ni electrodomésticos). */
@@ -82,11 +91,13 @@ export const MARKET_RANGES_MTY: Record<string, { label: string; lowCents: Cents;
   librero: { label: 'Librero / zapatera / exhibidor', lowCents: 500000, highCents: 900000 },
   bano: { label: 'Gabinete de baño', lowCents: 600000, highCents: 1000000 },
   led: { label: 'LED empotrado instalado (por metro)', lowCents: 90000, highCents: 150000 },
+  peinador: { label: 'Peinador con espejo (por pieza)', lowCents: 650000, highCents: 1500000 },
 };
 
 const FAMILY_RANGE: Record<string, keyof typeof MARKET_RANGES_MTY> = {
   kitchen_base: 'base', kitchen_base_drawer: 'base', kitchen_wall: 'aereo', pantry: 'alacena', kitchen_island: 'base', wardrobe: 'closet', walkin: 'vestidor',
-  dresser: 'cajonera', nightstand: 'buro', floating_drawer: 'buro', desk: 'escritorio', credenza: 'base', filing_cabinet: 'cajonera', tv_console: 'tv',
+  dresser: 'cajonera', nightstand: 'buro', floating_drawer: 'buro',
+  vanity_floating: 'peinador', vanity_nordic: 'peinador', vanity_industrial: 'peinador', vanity_hollywood: 'peinador', desk: 'escritorio', credenza: 'base', filing_cabinet: 'cajonera', tv_console: 'tv',
   bookcase: 'librero', bath_vanity: 'bano', laundry: 'base', shoe_cabinet: 'librero', display: 'librero', counter: 'base', custom: 'base',
 };
 
@@ -301,6 +312,14 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
   add('armado', 'Armado y herrajes', modules * 45 + doors * 8 + drawers * 12, 'oficial+ayudante', `${modules} cajas × 45 min + ${doors} puertas × 8 + ${drawers} cajones × 12`);
   add('herreria', 'Herrería (corte, soldadura, pintura)', steelFrames * 90, 'oficial', `${steelFrames} bastidor(es) × 90 min`);
   add('led', 'Armado eléctrico LED', ledRuns * 20 + drivers * 30, 'oficial', `${ledRuns} tramos × 20 min + ${drivers} fuente(s) × 30 min`);
+  const fxAll = calc.modules.flatMap((m) => m.fixtures ?? []);
+  const nLegs = fxAll.filter((f) => f.kind === 'leg').length;
+  const nMirrors = fxAll.filter((f) => f.kind === 'mirror').length;
+  const nBulbs = fxAll.filter((f) => f.kind === 'bulb').length;
+  const nOut = fxAll.filter((f) => f.kind === 'outlet').length, nGrom = fxAll.filter((f) => f.kind === 'grommet').length, nExit = fxAll.filter((f) => f.kind === 'cable_exit').length;
+  add('patas', 'Patas', nLegs * 5, 'oficial', `${nLegs} patas × 5 min`);
+  add('espejo', 'Espejo e iluminación', nMirrors * 30 + nBulbs * 6, 'oficial+ayudante', `${nMirrors} espejo(s) × 30 min + ${nBulbs} focos × 6 min`);
+  add('electrico', 'Conexión eléctrica', nOut * 25 + nGrom * 8 + nExit * 5, 'oficial', `${nOut} contactos × 25 min + ${nGrom} pasacables × 8 + ${nExit} salidas × 5`);
   add('empaque', 'Empaque', modules * 10, 'oficial+ayudante', `${modules} módulos × 10 min`);
   if (settings.includeInstallation) add('instalacion', 'Instalación en obra', (modules - wallOrTall) * 60 + wallOrTall * 75 + ledModules * 20, 'oficial+ayudante', `${modules - wallOrTall} × 60 min + ${wallOrTall} aéreos/altos × 75 min + ${ledModules} con LED × 20 min`);
   const laborCents = labor.reduce((s, l) => s + l.cents, 0);
@@ -321,7 +340,7 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
   for (const m of project.modules) {
     const k = FAMILY_RANGE[m.familyId] ?? 'base';
     const r = MARKET_RANGES_MTY[k]!;
-    const units = k === 'buro' ? 1 : m.widthMm / 1000;
+    const units = k === 'buro' || k === 'peinador' ? 1 : m.widthMm / 1000;
     const g = groups.get(k) ?? { label: r.label, linearM: 0, lowCents: 0, highCents: 0 };
     g.linearM = r2(g.linearM + units);
     g.lowCents += Math.round(r.lowCents * units);
