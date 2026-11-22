@@ -297,6 +297,8 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
   }
   let dividers = spec.dividerCount ?? autoDividers;
   // Cajones a todo el ancho: sin divisores. En «cajón + puertas» los divisores llegan sólo hasta el travesaño.
+  // Cama abatible: la base entra completa en el mueble, sin divisores.
+  if (spec.front === 'fold_down' && spec.foldKind === 'bed') dividers = 0;
   if (spec.front === 'drawers' && dividers > 0) {
     if (spec.dividerCount) b.issue({ code: 'DRAWERS_WITH_DIVIDERS', severity: 'warning', message: 'Los frentes de cajón ocupan todo el ancho: se omiten divisores. Divida en módulos si se requieren columnas.' });
     dividers = 0;
@@ -402,6 +404,7 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
       placements: [box(T, W - T, y0, y1, r2(rz), r2(rz + T))], notes: ['Separa el cajón de las puertas; fijar con excéntrico o tornillo a ambos costados.'] });
   }
   if (layout.door) buildDoors(ctx, zb, dividers, layout.door);
+  const fold = spec.front === 'fold_down' ? buildFold(ctx, zb, cd) : null;
   if (layout.drawers.length) buildDrawers(ctx, cd, y0, layout.drawers);
 
   // Base / zoclo / herrería
@@ -418,7 +421,47 @@ function buildBox(ctx: Ctx): Partial<ModuleResult> {
     carcassDepthMm: r2(cd),
     overallHeightMm: H + baseH,
     steel,
+    fold,
   };
+}
+
+/**
+ * Frente abatible: un solo panel con bisagras en el canto inferior que baja hasta quedar horizontal.
+ * Escritorio → compases; mesa → escuadras abatibles; cama → mecanismo de pistones y patas abatibles.
+ */
+function buildFold(ctx: Ctx, zb: number, cd: number): NonNullable<ModuleResult['fold']> {
+  const { spec, L, b, material } = ctx;
+  const { widthMm: W, heightMm: H, depthMm: D, thicknessMm: T } = spec;
+  const r = spec.revealMm;
+  const lh = H - 2 * r, lw = W - 2 * r;
+  const kind = spec.foldKind ?? 'desk';
+  const names = { desk: 'Frente abatible (cubierta de escritorio)', bed: 'Base de cama abatible', table: 'Cubierta de mesa abatible' } as const;
+  const leaf = b.part({ code: 'FOLD_LEAF', name: names[kind], role: 'front', lengthMm: lw, widthMm: lh, thicknessMm: T, grainAxis: 'length', edges: edgesFor(spec, 'front'), materialId: material.id,
+    placements: [box(r, W - r, 0, T, zb + r, zb + r + lh)],
+    notes: kind === 'bed' ? ['Reforzar con bastidor o listones según el mecanismo; colchón máx. 20 cm.'] : ['Abierto queda horizontal sobre el eje inferior.'],
+    validationStatus: 'pending_validation' });
+  const hw = (id: string, quantity: number, basis: string) => { const h = L.hardware(id); b.hw({ category: h.category, productId: h.id, productKey: h.productKey, description: h.name, quantity, unit: h.unit, basis, validationStatus: h.validationStatus }); };
+  const kg = r2((lw * lh * T * 1e-9) * material.densityKgM3);
+  if (kind === 'bed') {
+    hw('bed-mechanism', 1, `Para base de ${lw} × ${lh} mm (${kg} kg + colchón)`);
+    hw('bed-leg', 2, '2 patas al pie de la cama');
+    hw('mattress-strap', 2, 'Sujetan el colchón al cerrar');
+    b.issue({ code: 'FOLD_BED_VALIDATION', severity: 'blocker', message: 'Cama abatible: el mecanismo debe estar certificado para el peso de la base y el colchón, y el mueble anclado a muro estructural.' });
+    if (lh < 1950) b.issue({ code: 'FOLD_BED_SHORT', severity: 'warning', partId: leaf.id, message: `Base de ${r2(lh)} mm: para colchón de 190 cm se recomiendan ≥ 1950 mm de alto de mueble útil.` });
+  } else {
+    hw('fold-hinge', W > 800 ? 3 : 2, `${W > 800 ? 3 : 2} bisagras en el canto inferior`);
+    if (kind === 'desk') hw('lid-stay', 2, 'Un compás por lado');
+    else hw('fold-bracket', W > 1000 ? 2 : 1, 'Escuadras abatibles bajo la cubierta');
+    hw('magnet-catch', 2, 'Mantiene cerrado el frente');
+    const h = L.maybeHardware(spec.handleProductId) ?? L.hardware('handle-generic');
+    b.hw({ category: 'handle', productId: h.id, productKey: h.productKey, description: h.name, quantity: 1, unit: h.unit, basis: '1 por frente', validationStatus: h.validationStatus });
+    b.issue({ code: 'FOLD_LOAD', severity: 'warning', partId: leaf.id, message: `Frente abatible de ${kg} kg: elegir ${kind === 'desk' ? 'compases' : 'escuadras'} para ese peso + 15 kg de uso; no subirse ni sentarse.` });
+    if (lh > 900) b.issue({ code: 'FOLD_TOO_DEEP', severity: 'warning', partId: leaf.id, message: `Abierto sobresale ${r2(lh)} mm: más de 90 cm es incómodo y carga mucho las bisagras.` });
+  }
+  const pivot = zb + r;
+  const elev = spec.mount === 'wall' ? spec.elevationMm ?? 0 : 0;
+  void cd;
+  return { kind, closedDepthMm: D, openDepthMm: r2(D + lh), surfaceHeightMm: r2(kind === 'bed' ? 350 : elev + pivot + T), leafPartId: leaf.id };
 }
 
 /**

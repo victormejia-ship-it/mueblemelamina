@@ -25,6 +25,7 @@ export const PART_CODE_ES: Record<string, string> = {
   TOP_LED: 'TAPA_LED',
   TOP_POWER: 'TAPA_ELECTRICA',
   SIDE_POWER: 'COSTADO_ELECTRICO',
+  FOLD_LEAF: 'FRENTE_ABATIBLE',
 };
 
 // Códigos más largos primero para que DRAWER_SIDE gane sobre SIDE.
