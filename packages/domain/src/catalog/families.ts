@@ -106,6 +106,26 @@ export const FAMILIES: FamilyDefinition[] = [
       mirror: { enabled: true, widthMm: 900, heightMm: 800, gapMm: 150, light: 'hollywood' }, power: { outlets: 1, usb: true, grommets: 0 } }),
     pendingRules: ['Focos a 127 V: instalación por electricista, con apagador.'],
   },
+  // Ahorra espacio: frentes abatibles que se cierran contra el muro.
+  {
+    id: 'fold_desk', name: 'Escritorio abatible de pared', category: 'space', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Gabinete delgado a muro con repisas; el frente baja con compases y queda como escritorio a 75 cm. Cerrado ocupa 30 cm.',
+    defaults: d({ widthMm: 900, heightMm: 720, depthMm: 300, front: 'fold_down', foldKind: 'desk', shelvesPerBay: 1, mount: 'wall', elevationMm: 730, shelfLoadKgM2: 20,
+      power: { outlets: 1, usb: true, grommets: 0 } }),
+    pendingRules: ['Compases con capacidad para el peso del frente + 15 kg de uso; anclaje a muro validado.'],
+  },
+  {
+    id: 'fold_bed', name: 'Cama abatible individual', category: 'space', geometryStrategy: 'box', status: 'template_requires_engine_validation',
+    description: 'Mueble de piso con base de cama que baja con mecanismo de pistones y patas abatibles. Cerrado ocupa 45 cm; abierto, la cama completa.',
+    defaults: d({ widthMm: 1040, heightMm: 2000, depthMm: 450, front: 'fold_down', foldKind: 'bed', shelvesPerBay: 0, baseType: 'plinth', baseHeightMm: 60, shelfLoadKgM2: 30, finishId: 'blanco' }),
+    pendingRules: ['Mecanismo certificado para el peso de colchón y base; anclaje a muro obligatorio; colchón máx. 20 cm.'],
+  },
+  {
+    id: 'fold_table', name: 'Mesa abatible de pared', category: 'space', geometryStrategy: 'box', status: 'configurable_base_template',
+    description: 'Marco delgado a muro; la cubierta baja con escuadras abatibles y queda como mesa o barra. Cerrado ocupa 14 cm.',
+    defaults: d({ widthMm: 800, heightMm: 700, depthMm: 140, front: 'fold_down', foldKind: 'table', shelvesPerBay: 0, mount: 'wall', elevationMm: 720, shelfLoadKgM2: 20 }),
+    pendingRules: ['Escuadras abatibles con capacidad declarada; anclaje a muro validado.'],
+  },
   {
     id: 'desk', name: 'Escritorio', category: 'office', geometryStrategy: 'desk', status: 'verified_vertical',
     description: 'Cubierta, costados tipo panel y faldón; o cubierta sobre bastidor de PTR (requiere validación de cargas).',
@@ -175,7 +195,7 @@ export const FAMILIES: FamilyDefinition[] = [
 ];
 
 export const CATEGORY_LABELS: Record<FamilyDefinition['category'], string> = {
-  kitchen: 'Cocina', bedroom: 'Recámara', office: 'Oficina', living: 'Sala', bath: 'Baño', service: 'Servicios', commercial: 'Comercial', custom: 'A medida',
+  kitchen: 'Cocina', bedroom: 'Recámara', office: 'Oficina', living: 'Sala', bath: 'Baño', service: 'Servicios', commercial: 'Comercial', space: 'Ahorra espacio', custom: 'A medida',
 };
 
 export const FAMILY_STATUS_LABELS: Record<FamilyDefinition['status'], string> = {

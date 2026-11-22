@@ -17,6 +17,11 @@ export interface AssemblyStep {
 
 type Shift = [number, number, number];
 const D = 300; // desplazamiento de la pieza que entra (mm)
+/** Nombres cortos del herraje de frentes abatibles. */
+const FOLD_HW: Record<string, string> = {
+  'hw:fold_hinge': 'bisagras', 'hw:lid_stay': 'compases', 'hw:fold_bracket': 'pares de escuadras',
+  'hw:bed_mechanism': 'mecanismo de pistones', 'hw:bed_leg': 'patas abatibles', 'hw:mattress_strap': 'correas',
+};
 
 const qty = (hw: HardwareRequirement[], cats: string[], label: (n: number) => string) => {
   const n = Math.round(hw.filter((h) => cats.includes(h.category)).reduce((s, h) => s + h.quantity, 0));
@@ -116,6 +121,11 @@ export function assemblyGuide(project: Project, calc: ProjectCalculation, catalo
     const boxes = byCode((c) => /^DRAWER_(SIDE|FB|BOTTOM)/.test(c));
     step('Arma y mete los cajones', boxes.flatMap(keysOf), Object.fromEntries(boxes.flatMap(keysOf).map((k) => [k, [0, -D * 1.4, 0] as Shift])), {
       pieces: boxes, hardware: qty(hw, ['drawer_slide'], (q) => pl(q, 'juego de correderas', 'juegos de correderas')),
+    });
+    const fold = byCode((c) => c === 'FOLD_LEAF');
+    step(spec.foldKind === 'bed' ? 'Monta el mecanismo y la base de cama' : 'Coloca el frente abatible', fold.flatMap(keysOf), Object.fromEntries(fold.flatMap(keysOf).map((k) => [k, [0, -D, 0] as Shift])), {
+      pieces: fold, hardware: hw.filter((h) => FOLD_HW[h.productKey]).map((h) => `${Math.round(h.quantity)} ${FOLD_HW[h.productKey]}`),
+      tip: spec.foldKind === 'bed' ? 'Entre dos personas; regula los pistones con la base cerrada.' : 'Ajusta los compases para que baje suave y quede horizontal.',
     });
     const fronts = byCode((c) => c.startsWith('DOOR') || c.startsWith('DRAWER_FRONT'));
     step(fronts.some((p) => p.code.startsWith('DOOR')) ? (fronts.some((p) => p.code.startsWith('DRAWER_FRONT')) ? 'Coloca puertas y frentes' : 'Coloca las puertas') : 'Coloca los frentes de cajón', fronts.flatMap(keysOf), Object.fromEntries(fronts.flatMap(keysOf).map((k) => [k, [0, -D, 0] as Shift])), {

@@ -75,6 +75,13 @@ export const MARKET_REFERENCE_MTY: Record<string, MarketRef> = {
   'hw:power_outlet_usb': ref(340, 240, 520, 'pza'),
   'hw:grommet60': ref(35, 20, 60, 'pza'),
   'hw:power_cable': ref(24, 16, 35, 'm', 'Uso rudo 3 × 14 AWG + clavija.'),
+  'hw:fold_hinge': ref(85, 55, 140, 'pza'),
+  'hw:lid_stay': ref(180, 110, 320, 'pza', 'Compás con freno; capacidad según peso del frente.'),
+  'hw:fold_bracket': ref(420, 280, 700, 'par'),
+  'hw:bed_mechanism': ref(3800, 2800, 6500, 'kit', 'Kit de pistones para cama individual; verificar capacidad.'),
+  'hw:bed_leg': ref(320, 200, 500, 'pza'),
+  'hw:mattress_strap': ref(90, 60, 140, 'pza'),
+  'hw:magnet_catch': ref(25, 15, 40, 'pza'),
 };
 
 /** Rango de precio de venta en Monterrey por metro lineal de frente (MXN sin IVA, instalado, melamina, sin cubierta ni electrodomésticos). */
@@ -92,11 +99,15 @@ export const MARKET_RANGES_MTY: Record<string, { label: string; lowCents: Cents;
   bano: { label: 'Gabinete de baño', lowCents: 600000, highCents: 1000000 },
   led: { label: 'LED empotrado instalado (por metro)', lowCents: 90000, highCents: 150000 },
   peinador: { label: 'Peinador con espejo (por pieza)', lowCents: 650000, highCents: 1500000 },
+  escritorio_abatible: { label: 'Escritorio abatible (por pieza)', lowCents: 450000, highCents: 900000 },
+  cama_abatible: { label: 'Cama abatible individual (por pieza)', lowCents: 1800000, highCents: 3500000 },
+  mesa_abatible: { label: 'Mesa abatible de pared (por pieza)', lowCents: 250000, highCents: 550000 },
 };
 
 const FAMILY_RANGE: Record<string, keyof typeof MARKET_RANGES_MTY> = {
   kitchen_base: 'base', kitchen_base_drawer: 'base', kitchen_wall: 'aereo', pantry: 'alacena', kitchen_island: 'base', wardrobe: 'closet', walkin: 'vestidor',
   dresser: 'cajonera', nightstand: 'buro', floating_drawer: 'buro',
+  fold_desk: 'escritorio_abatible', fold_bed: 'cama_abatible', fold_table: 'mesa_abatible',
   vanity_floating: 'peinador', vanity_nordic: 'peinador', vanity_industrial: 'peinador', vanity_hollywood: 'peinador', desk: 'escritorio', credenza: 'base', filing_cabinet: 'cajonera', tv_console: 'tv',
   bookcase: 'librero', bath_vanity: 'bano', laundry: 'base', shoe_cabinet: 'librero', display: 'librero', counter: 'base', custom: 'base',
 };
@@ -320,6 +331,8 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
   add('patas', 'Patas', nLegs * 5, 'oficial', `${nLegs} patas × 5 min`);
   add('espejo', 'Espejo e iluminación', nMirrors * 30 + nBulbs * 6, 'oficial+ayudante', `${nMirrors} espejo(s) × 30 min + ${nBulbs} focos × 6 min`);
   add('electrico', 'Conexión eléctrica', nOut * 25 + nGrom * 8 + nExit * 5, 'oficial', `${nOut} contactos × 25 min + ${nGrom} pasacables × 8 + ${nExit} salidas × 5`);
+  const folds = calc.modules.filter((m) => m.fold).map((m) => m.fold!.kind);
+  add('abatible', 'Mecanismo abatible', folds.reduce((t, k) => t + (k === 'bed' ? 120 : k === 'desk' ? 40 : 25), 0), 'oficial+ayudante', folds.map((k) => (k === 'bed' ? 'cama 120 min' : k === 'desk' ? 'escritorio 40 min' : 'mesa 25 min')).join(' + '));
   add('empaque', 'Empaque', modules * 10, 'oficial+ayudante', `${modules} módulos × 10 min`);
   if (settings.includeInstallation) add('instalacion', 'Instalación en obra', (modules - wallOrTall) * 60 + wallOrTall * 75 + ledModules * 20, 'oficial+ayudante', `${modules - wallOrTall} × 60 min + ${wallOrTall} aéreos/altos × 75 min + ${ledModules} con LED × 20 min`);
   const laborCents = labor.reduce((s, l) => s + l.cents, 0);
@@ -340,7 +353,7 @@ export function marketEstimate(project: Project, plan: ManufacturingPlan, catalo
   for (const m of project.modules) {
     const k = FAMILY_RANGE[m.familyId] ?? 'base';
     const r = MARKET_RANGES_MTY[k]!;
-    const units = k === 'buro' || k === 'peinador' ? 1 : m.widthMm / 1000;
+    const units = ['buro', 'peinador', 'escritorio_abatible', 'cama_abatible', 'mesa_abatible'].includes(k) ? 1 : m.widthMm / 1000;
     const g = groups.get(k) ?? { label: r.label, linearM: 0, lowCents: 0, highCents: 0 };
     g.linearM = r2(g.linearM + units);
     g.lowCents += Math.round(r.lowCents * units);

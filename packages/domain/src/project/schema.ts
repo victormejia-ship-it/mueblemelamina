@@ -22,7 +22,7 @@ export const ModuleSpecSchema = z.object({
   edgeBandId: z.string().min(1),
   edgePolicy: z.enum(['front_visible_only', 'all_visible', 'none']),
   construction: z.enum(['top_bottom_between_sides', 'sides_between_top_bottom']),
-  front: z.enum(['open', 'doors', 'drawers', 'drawer_doors']),
+  front: z.enum(['open', 'doors', 'drawers', 'drawer_doors', 'fold_down']),
   doorCount: z.number().int().min(1).max(8).nullable(),
   drawerCount: z.number().int().min(0).max(10),
   // Campo agregado después de 1.0.0.
@@ -60,6 +60,7 @@ export const ModuleSpecSchema = z.object({
   }).default({ enabled: false, widthMm: 800, heightMm: 700, gapMm: 200, light: 'none' }),
   power: z.object({ outlets: z.number().int().min(0).max(6), usb: z.boolean(), grommets: z.number().int().min(0).max(6) }).default({ outlets: 0, usb: false, grommets: 0 }),
   elevationMm: mm.min(0).max(3000).nullable().default(null),
+  foldKind: z.enum(['desk', 'bed', 'table']).default('desk'),
 });
 
 export const PricingSchema = z.object({

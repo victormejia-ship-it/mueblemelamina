@@ -49,7 +49,7 @@ export interface ScenePolygon {
   /** Pieza que se coloca en el paso de armado actual. */
   adding?: boolean;
 }
-export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' | 'edge' | 'diag' | 'led' | 'arrow' }
+export interface SceneLine { x1: number; y1: number; x2: number; y2: number; kind: 'dim' | 'ext' | 'edge' | 'diag' | 'led' | 'arrow' | 'open' }
 export interface SceneLabel { x: number; y: number; text: string; kind: 'dim' | 'id' | 'title' | 'subtitle' | 'focus'; anchor: 'start' | 'middle' | 'end' }
 
 export interface Scene {
@@ -337,7 +337,22 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
   // Enfoque de herramienta: cantos de piezas resaltadas y diagonales del frente de cada caja (coordenadas 3D)
   const focus = opts.focus ?? null;
   const focusSet = new Set(focus?.partIds ?? []);
-  const extra3: { a: [number, number, number]; b: [number, number, number]; kind: 'edge' | 'diag' | 'led' }[] = [];
+  const extra3: { a: [number, number, number]; b: [number, number, number]; kind: 'edge' | 'diag' | 'led' | 'open' }[] = [];
+  const foldLabels3: { p: [number, number, number]; text: string }[] = [];
+  // Frentes abatibles: silueta punteada de cómo queda abierto y cuánto ocupa desde el muro.
+  if (!opts.exploded && !opts.minimal && !opts.assembly) {
+    for (const m of calc.modules) {
+      if (!m.fold) continue;
+      const leaf = m.parts.find((p) => p.id === m.fold!.leafPartId)?.placements[0];
+      if (!leaf) continue;
+      const dz = zl(m.moduleId);
+      const len = leaf.z1 - leaf.z0;
+      const X0 = leaf.x0 + m.offsetXMm, X1 = leaf.x1 + m.offsetXMm, Y = leaf.y0 + m.offsetYMm, Z = leaf.z0 + dz;
+      const c: [number, number, number][] = [[X0, Y - len, Z], [X1, Y - len, Z], [X1, Y, Z], [X0, Y, Z]];
+      for (let i = 0; i < 4; i++) extra3.push({ a: c[i]!, b: c[(i + 1) % 4]!, kind: 'open' });
+      foldLabels3.push({ p: [(X0 + X1) / 2, Y - len / 2, Z], text: `Abierto: ${Math.round(m.fold.openDepthMm / 10)} cm del muro` });
+    }
+  }
   // Ranuras LED (router): siempre visibles en el modelo armado para saber dónde se fresa.
   if (!opts.exploded && !opts.minimal) {
     for (const r of calc.ledRuns) {
@@ -440,6 +455,10 @@ export function buildScene(project: Project, calc: ProjectCalculation, catalog: 
     const a = T(project3(view, ...e.a)), b = T(project3(view, ...e.b));
     lines.push({ x1: a[0], y1: a[1], x2: b[0], y2: b[1], kind: 'arrow' });
   }
+  for (const l of foldLabels3) {
+    const p = T(project3(view, ...l.p));
+    labels.push({ x: p[0], y: p[1], text: l.text, kind: 'focus', anchor: 'middle' });
+  }
   for (const l of extraLabels3) {
     const p = T(project3(view, ...l.p));
     labels.push({ x: p[0], y: p[1], text: l.text, kind: 'focus', anchor: 'middle' });
@@ -469,6 +488,7 @@ export function sceneToSvg(scene: Scene, theme: 'dark' | 'light' | 'transparent'
   for (const l of scene.lines) {
     if (l.kind === 'edge') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#ff9f43" stroke-width="3" stroke-linecap="round"/>`);
     else if (l.kind === 'diag') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#5fd4ef" stroke-width="2" stroke-dasharray="8 5"/>`);
+    else if (l.kind === 'open') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#2f9e6a" stroke-width="2" stroke-dasharray="6 4"/>`);
     else if (l.kind === 'arrow') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#d9480f" stroke-width="3" stroke-linecap="round" stroke-dasharray="7 5" marker-end="url(#ms-push)"/>`);
     else if (l.kind === 'led') parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#ffd84d" stroke-width="3.5" stroke-linecap="round"/>`);
     else parts.push(`<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${dim}" stroke-width="1.3" marker-start="url(#ms-arrow)" marker-end="url(#ms-arrow)"/>`);

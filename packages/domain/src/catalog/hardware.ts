@@ -83,6 +83,14 @@ export const HARDWARE: HardwareProduct[] = [
   { id: 'power-outlet-usb', category: 'power', name: 'Contacto para mueble Ø60 mm con 2 USB, 127 V', manufacturer: null, sku: null, productKey: 'hw:power_outlet_usb', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'grommet-60', category: 'power', name: 'Pasacables Ø60 mm con tapa', manufacturer: null, sku: null, productKey: 'hw:grommet60', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'power-cable', category: 'power', name: 'Cable uso rudo 3 × 14 AWG con clavija', manufacturer: null, sku: null, productKey: 'hw:power_cable', unit: 'm', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  // Frentes abatibles
+  { id: 'fold-hinge', category: 'hinge', name: 'Bisagra para frente abatible (eje inferior)', manufacturer: null, sku: null, productKey: 'hw:fold_hinge', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'lid-stay', category: 'lift_system', name: 'Compás de soporte con freno para frente abatible', manufacturer: null, sku: null, productKey: 'hw:lid_stay', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'fold-bracket', category: 'lift_system', name: 'Escuadra abatible para mesa (par)', manufacturer: null, sku: null, productKey: 'hw:fold_bracket', unit: 'par', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'bed-mechanism', category: 'lift_system', name: 'Mecanismo de cama abatible con pistones (kit)', manufacturer: null, sku: null, productKey: 'hw:bed_mechanism', unit: 'kit', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'bed-leg', category: 'lift_system', name: 'Pata abatible para cama', manufacturer: null, sku: null, productKey: 'hw:bed_leg', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'mattress-strap', category: 'lift_system', name: 'Correa para sujetar colchón', manufacturer: null, sku: null, productKey: 'hw:mattress_strap', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
+  { id: 'magnet-catch', category: 'handle', name: 'Cierre magnético', manufacturer: null, sku: null, productKey: 'hw:magnet_catch', unit: 'pza', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
   { id: 'led-cable-2x20', category: 'led_cable', name: 'Cable dúplex calibre 20 AWG + conectores', manufacturer: null, sku: null, productKey: 'hw:led_cable2x20', unit: 'm', technicalDatasheetUrl: null, validationStatus: 'pending_validation' },
 ];
 

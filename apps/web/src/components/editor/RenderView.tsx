@@ -8,6 +8,7 @@ import type * as THREE_NS from 'three';
 type Three = typeof THREE_NS;
 const S = 0.001; // mm → m
 const DOOR_KEY = /(^|[-_])DOOR(_\d+)?#\d+$/;
+const FOLD_KEY = /-FOLD_LEAF#\d+$/;
 
 /** Textura procedural de veta: franjas suaves con ondulación y poro, en escala de grises para teñir con el color del acabado. */
 function grainCanvas(): HTMLCanvasElement {
@@ -106,7 +107,7 @@ function buildModel(ctx: Ctx, rm: RenderModel, doorsOpen: boolean, fresh: boolea
   };
   const edgeMat = new T.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 });
   // Pivotes de puertas
-  const doorPivot = new Map<string, { pivot: THREE_NS.Group; sign: number }>();
+  const doorPivot = new Map<string, { pivot: THREE_NS.Group; sign: number; base?: number }>();
   let ledLights = 0;
   for (const r of rm.boxes) {
     const mesh = new T.Mesh(boxGeometry(T, r), matFor(r));
@@ -128,7 +129,31 @@ function buildModel(ctx: Ctx, rm: RenderModel, doorsOpen: boolean, fresh: boolea
     if (!isLed) mesh.add(new T.LineSegments(new T.EdgesGeometry(mesh.geometry), edgeMat));
     const doorKey = r.key.replace(/-jaladera$/, '');
     const isDoor = DOOR_KEY.test(doorKey);
-    if (doorsOpen && isDoor) {
+    const isFold = FOLD_KEY.test(doorKey);
+    if (doorsOpen && isFold) {
+      // Frente abatible: gira sobre su canto inferior hasta quedar horizontal (hacia el frente).
+      let d = doorPivot.get(doorKey);
+      if (!d) {
+        const host = rm.boxes.find((x) => x.key === doorKey)!;
+        const pivot = new T.Group();
+        pivot.position.set(0, host.b.z0 * S, -host.b.y0 * S);
+        pivot.rotation.x = Math.PI / 2;
+        model.add(pivot);
+        // Cama: la base queda a la altura del mecanismo y lleva colchón.
+        const bed = host.fold?.kind === 'bed';
+        d = { pivot, sign: 1, base: pivot.position.y };
+        doorPivot.set(doorKey, d);
+        if (bed) {
+          const mattress = new T.Mesh(boxGeometry(T, { ...host, key: `${doorKey}-colchon`, grainDir: null, b: { x0: host.b.x0 + 15, x1: host.b.x1 - 15, y0: host.b.y0 - 200, y1: host.b.y0, z0: host.b.z0 + 20, z1: host.b.z1 - 20 } }), new T.MeshStandardMaterial({ color: new T.Color('#dfe6ec'), roughness: 0.9 }));
+          mattress.castShadow = true; mattress.receiveShadow = true;
+          mattress.position.set(0, -pivot.position.y, -pivot.position.z);
+          pivot.add(mattress);
+          pivot.position.y = Math.max(pivot.position.y, (host.fold!.surfaceMm - 18) * S);
+        }
+      }
+      mesh.position.set(0, -d.base!, -d.pivot.position.z);
+      d.pivot.add(mesh);
+    } else if (doorsOpen && isDoor) {
       let d = doorPivot.get(doorKey);
       if (!d) {
         const host = rm.boxes.find((x) => x.key === doorKey)!;
@@ -186,7 +211,7 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
   const [doorsOpen, setDoorsOpen] = useState(false);
   const [ledOn, setLedOn] = useState(false);
   const rm = useMemo(() => renderModel(project, calc, DEFAULT_CATALOG, finish || undefined), [project, calc, finish]);
-  const hasDoors = useMemo(() => rm.boxes.some((b) => DOOR_KEY.test(b.key)), [rm]);
+  const hasDoors = useMemo(() => rm.boxes.some((b) => DOOR_KEY.test(b.key) || FOLD_KEY.test(b.key)), [rm]);
   const hasLed = useMemo(() => rm.boxes.some((b) => b.material.kind === 'led'), [rm]);
   const framedFor = useRef<string>('');
 
@@ -293,7 +318,7 @@ export default function RenderView({ project, calc }: { project: Project; calc: 
         )}
         {hasDoors && (
           <button type="button" aria-pressed={doorsOpen} onClick={() => setDoorsOpen(!doorsOpen)} data-testid="render-doors"
-            className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${doorsOpen ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><DoorOpen aria-hidden className="h-4 w-4" />{doorsOpen ? 'Cerrar puertas' : 'Abrir puertas'}</button>
+            className={`flex h-8 items-center gap-1 rounded-lg px-2 text-[12px] font-semibold ${doorsOpen ? 'bg-accent text-accent-ink' : 'bg-[#253541]'}`}><DoorOpen aria-hidden className="h-4 w-4" />{rm.boxes.some((b) => DOOR_KEY.test(b.key)) ? (doorsOpen ? 'Cerrar puertas' : 'Abrir puertas') : (doorsOpen ? 'Cerrar' : 'Abrir')}</button>
         )}
         <button type="button" onClick={() => ctxRef.current?.controls.reset()} title="Volver al encuadre" aria-label="Volver al encuadre" className="flex h-8 items-center rounded-lg bg-[#253541] px-2"><RotateCcw aria-hidden className="h-4 w-4" /></button>
         <button type="button" onClick={snapshot} data-testid="render-snapshot" className="flex h-8 items-center gap-1 rounded-lg bg-[#253541] px-2 text-[12px] font-semibold"><Camera aria-hidden className="h-4 w-4" />Imagen</button>

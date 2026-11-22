@@ -148,7 +148,7 @@ test('página general del taller', async ({ page }) => {
 test('portada: catálogo con búsqueda, categorías y proyectos recientes', async ({ page }) => {
   await page.goto('/');
   const grid = page.getByTestId('catalog-grid');
-  await expect(grid.locator('li')).toHaveCount(25);
+  await expect(grid.locator('li')).toHaveCount(28);
   await expect(grid.locator('svg').first()).toBeVisible();
   await page.getByTestId('catalog-search').fill('closet');
   await expect(grid.locator('li')).toHaveCount(1);
@@ -322,4 +322,18 @@ test('peinadores y conexión eléctrica', async ({ page }) => {
   await expect(page.getByTestId('assembly-guide')).toContainText('Coloca contactos y pasacables');
   await openTab(page, 'workshop');
   await expect(page.getByTestId('equipment-sierra-copa')).toBeVisible();
+});
+
+test('ahorra espacio: escritorio abatible con silueta abierta', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('cat-space').click();
+  await expect(page.getByTestId('catalog-grid').locator('li')).toHaveCount(3);
+  await page.getByTestId('family-fold_desk').click();
+  await page.waitForURL(/editor/);
+  await expect(page.getByTestId('fold-legend')).toContainText('Cerrado 30 cm');
+  await expect(page.getByTestId('model-svg').locator('line[data-kind="open"]')).toHaveCount(4);
+  await expect(page.getByTestId('mod-fold')).toHaveValue('desk');
+  await page.getByTestId('mod-fold').selectOption('table');
+  await openTab(page, 'assembly');
+  await expect(page.getByTestId('assembly-guide')).toContainText('Coloca el frente abatible');
 });

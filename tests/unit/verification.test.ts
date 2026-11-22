@@ -55,7 +55,9 @@ describe('verificación dimensional de todo el catálogo', () => {
   it('todas las familias y frentes cierran en medidas, sin piezas flotantes ni desajustes', () => {
     for (const f of FAMILIES) {
       const low = f.defaults.heightMm < 400;
-      for (const front of ['open', 'doors', 'drawers', ...(low ? [] : ['drawer_doors' as const])] as const) {
+      const shallow = f.defaults.depthMm < 300; // sin espacio para correderas
+      const narrow = f.defaults.widthMm <= 1200 && f.defaults.heightMm <= 2100; // un frente abatible de una pieza cabe en el tablero
+      for (const front of ['open', 'doors', ...(narrow ? ['fold_down' as const] : []), ...(shallow ? [] : ['drawers' as const]), ...(low || shallow ? [] : ['drawer_doors' as const])] as const) {
         const r = calculateModule({ ...createModule(f.id, cat, 'X'), front, drawerCount: front === 'drawer_doors' ? 1 : low ? 1 : 3, slideProductId: 'slide-generic-telescopic' }, cat);
         expect(r.issues.filter((i) => i.severity === 'error'), `${f.id}/${front}`).toEqual([]);
         const bad = r.checks.filter((c) => c.status === 'error' || c.status === 'warning').map((c) => `${c.label}: ${c.actual}`);

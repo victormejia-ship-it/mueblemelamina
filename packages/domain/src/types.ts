@@ -19,7 +19,7 @@ export const SCHEMA_VERSION = '1.0.0';
 // Catálogo
 // ---------------------------------------------------------------------------
 
-export type FamilyCategory = 'kitchen' | 'bedroom' | 'office' | 'living' | 'bath' | 'service' | 'commercial' | 'custom';
+export type FamilyCategory = 'kitchen' | 'bedroom' | 'office' | 'living' | 'bath' | 'service' | 'commercial' | 'space' | 'custom';
 export type GeometryStrategy = 'box' | 'wardrobe' | 'desk' | 'composite';
 /**
  * verified_vertical: implementación constructiva cubierta por pruebas (gabinete, clóset, escritorio).
@@ -29,7 +29,9 @@ export type GeometryStrategy = 'box' | 'wardrobe' | 'desk' | 'composite';
 export type FamilyStatus = 'verified_vertical' | 'configurable_base_template' | 'template_requires_engine_validation';
 
 /** drawer_doors: cajón(es) pequeños arriba y puertas abajo (base de cocina típica). */
-export type FrontType = 'open' | 'doors' | 'drawers' | 'drawer_doors';
+export type FrontType = 'open' | 'doors' | 'drawers' | 'drawer_doors' | 'fold_down';
+/** Uso del frente abatible: escritorio (compases), cama (mecanismo de pistones) o mesa (escuadras abatibles). */
+export type FoldKind = 'desk' | 'bed' | 'table';
 /** equal: frentes iguales; graduated: más chicos arriba y más altos abajo. */
 export type DrawerLayout = 'equal' | 'graduated';
 export type ConstructionStrategy = 'top_bottom_between_sides' | 'sides_between_top_bottom';
@@ -84,6 +86,7 @@ export interface FamilyDefaults {
   power?: PowerSpec;
   elevationMm?: Mm;
   steelFinish?: SteelFrameSpec['finish'];
+  foldKind?: FoldKind;
   baseHeightMm: Mm;
   mount: MountType;
   /** Carga de diseño sobre entrepaños/cubierta (kg/m²) para el cálculo de flecha. */
@@ -284,6 +287,8 @@ export interface ModuleSpec {
   power: PowerSpec;
   /** Muebles a muro: altura del piso al fondo del mueble; null = altura de referencia. */
   elevationMm: Mm | null;
+  /** Frente abatible: para qué se usa abierto. */
+  foldKind: FoldKind;
 }
 
 export type ProjectStatus = 'DRAFT_NOT_RELEASED_FOR_MANUFACTURING' | 'RELEASED_WITH_APPROVAL';
@@ -521,6 +526,8 @@ export interface ModuleResult {
   ledRuns: LedRun[];
   /** Patas, espejo, focos y puntos eléctricos. */
   fixtures: Fixture[];
+  /** Frente abatible: cuánto ocupa cerrado y abierto (desde el muro) y a qué altura queda la superficie. */
+  fold?: { kind: FoldKind; closedDepthMm: Mm; openDepthMm: Mm; surfaceHeightMm: Mm; leafPartId: string } | null;
 }
 
 export interface EdgeBandTotal {

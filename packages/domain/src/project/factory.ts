@@ -84,6 +84,7 @@ export function createModule(familyId: string, catalog: Catalog, id: string, lab
     mirror: { ...(f.defaults.mirror ?? DEFAULT_MIRROR) },
     power: { ...(f.defaults.power ?? DEFAULT_POWER) },
     elevationMm: f.defaults.elevationMm ?? null,
+    foldKind: f.defaults.foldKind ?? 'desk',
   };
 }
 

@@ -2,7 +2,7 @@ import { DEFAULT_CATALOG, type Box3, type Catalog, type Project, type ProjectCal
 
 /** Material de una caja del render: color base y, si tiene veta, su dirección en el mundo. */
 export interface RenderMaterial { color: string; grain: boolean; kind: 'board' | 'back' | 'drawer' | 'steel' | 'handle' | 'led' | 'mirror' }
-export interface RenderBox { key: string; partId: string; role: string; b: Box3; material: RenderMaterial; grainDir: 'x' | 'y' | 'z' | null; /** Tiras LED: hacia dónde ilumina (ejes del mueble). */ lightDir?: [number, number, number] }
+export interface RenderBox { key: string; partId: string; role: string; b: Box3; material: RenderMaterial; grainDir: 'x' | 'y' | 'z' | null; /** Tiras LED: hacia dónde ilumina (ejes del mueble). */ lightDir?: [number, number, number]; /** Frente abatible: uso y altura de la superficie abierta (mm). */ fold?: { kind: 'desk' | 'bed' | 'table'; surfaceMm: number } }
 export interface RenderModel { boxes: RenderBox[]; bounds: Box3; wallMounted: boolean }
 
 const HANDLE_LEN = 128, HANDLE_T = 12, HANDLE_OUT = 28;
@@ -38,7 +38,8 @@ export function renderModel(project: Project, calc: ProjectCalculation, catalog:
         const ext = { x: pl.x1 - pl.x0, y: pl.y1 - pl.y0, z: pl.z1 - pl.z0 };
         const target = p.grainAxis === 'width' ? p.widthMm : p.lengthMm;
         const grainDir = material.grain ? (['x', 'y', 'z'] as const).reduce((best, a) => Math.abs(ext[a] - target) < Math.abs(ext[best] - target) ? a : best, 'z' as 'x' | 'y' | 'z') : null;
-        boxes.push({ key: `${p.id}#${i + 1}`, partId: p.id, role: p.role, b: move(pl), material, grainDir });
+        const fold = m.fold && m.fold.leafPartId === p.id ? { kind: m.fold.kind, surfaceMm: m.fold.surfaceHeightMm } : undefined;
+        boxes.push({ key: `${p.id}#${i + 1}`, partId: p.id, role: p.role, b: move(pl), material, grainDir, ...(fold ? { fold } : {}) });
         // Jaladera ilustrativa
         if (p.role !== 'front' || !spec) return;
         const handle: RenderMaterial = { color: '#b8bec4', grain: false, kind: 'handle' };
